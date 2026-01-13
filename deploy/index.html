@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#ffffff">
+    <title>Stylistt - Your AI-Powered Wardrobe Atelier</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Manrope:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#000000",
+                        "accent-gold": "#C5A059",
+                        "soft-gray": "#F8F8F8"
+                    },
+                    fontFamily: {
+                        "serif": ["'Playfair Display'", "serif"],
+                        "sans": ["Manrope", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { min-height: 100dvh; font-family: 'Manrope', sans-serif; }
+        ::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
+        .brand-title { font-family: 'Playfair Display', serif; letter-spacing: -0.01em; }
+        .brand-logo { font-family: 'Playfair Display', serif; letter-spacing: -0.02em; }
+        .magazine-shadow { box-shadow: 0 10px 40px -15px rgba(0,0,0,0.08); }
+        .camera-shadow { box-shadow: 0 8px 25px -5px rgba(0,0,0,0.3); }
+        .nav-shadow { box-shadow: 0 -4px 20px -5px rgba(0,0,0,0.05); }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        .animate-fade-in-up { animation: fadeInUp 0.6s ease-out; }
+        .screen-enter { animation: fadeIn 0.3s ease-out; }
+        .heart-btn.active span { font-variation-settings: 'FILL' 1; color: #C5A059; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
+        .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; max-width: 430px; margin: 0 auto; z-index: 50; }
+        .quiz-option { transition: all 0.3s ease; border: 2px solid transparent; }
+        .quiz-option.selected { border-color: black; }
+        .palette-circle { border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body class="bg-white">
+    <div id="app" class="relative flex min-h-screen w-full flex-col max-w-[430px] mx-auto overflow-x-hidden bg-white">
+        <div id="screen-container"></div>
+    </div>
+
+<script>
+// ============ ROUTER ============
+const Router = {
+    routes: {},
+    register(path, handler) { this.routes[path] = handler; },
+    navigate(path) { window.location.hash = path; },
+    getRoute() { return window.location.hash.slice(1) || '/welcome'; },
+
+    parseParams(pattern, route) {
+        const pp = pattern.split('/'), rp = route.split('/'), params = {};
+        if (pp.length !== rp.length) return null;
+        for (let i = 0; i < pp.length; i++) {
+            if (pp[i].startsWith(':')) params[pp[i].slice(1)] = rp[i];
+            else if (pp[i] !== rp[i]) return null;
+        }
+        return params;
+    },
+
+    findHandler(route) {
+        if (this.routes[route]) return { handler: this.routes[route], params: {} };
+        for (const p in this.routes) {
+            if (p.includes(':')) {
+                const params = this.parseParams(p, route);
+                if (params) return { handler: this.routes[p], params };
+            }
+        }
+        return null;
+    },
+
+    handleRouteChange() {
+        const route = this.getRoute();
+        const match = this.findHandler(route);
+        if (match) {
+            const container = document.getElementById('screen-container');
+            container.innerHTML = '';
+            container.className = 'screen-enter';
+            match.handler(match.params);
+            this.updateNav(route);
+        } else {
+            this.navigate('/welcome');
+        }
+    },
+
+    updateNav(route) {
+        const map = {'/daily-edit':'home','/ai-outfit':'styling','/scan':'camera','/closet':'closet','/profile':'profile'};
+        document.querySelectorAll('.nav-item').forEach(item => {
+            const id = item.dataset.nav;
+            if (map[route] === id) {
+                item.classList.add('text-black');
+                item.classList.remove('text-gray-400');
+            } else if (id !== 'camera') {
+                item.classList.remove('text-black');
+                item.classList.add('text-gray-400');
+            }
+        });
+    },
+
+    init() {
+        window.addEventListener('hashchange', () => this.handleRouteChange());
+        window.addEventListener('load', () => this.handleRouteChange());
+    }
+};
+
+// ============ APP STATE ============
+const App = {
+    state: {
+        user: { name: 'Studio', initials: 'JB', archetype: 'Parisian Chic', piecesScanned: 42, looksCreated: 12, totalItems: 184 },
+        styleDNA: { step: 1, totalSteps: 5, selections: {} },
+        favorites: new Set(),
+        closetFilter: 'All Items'
+    },
+
+    data: {
+        lookbooks: [
+            { id: 'weekend-chic', title: 'Weekend Chic', description: 'A sophisticated blend of textures: soft cream cashmere paired with fluid silk wide-leg trousers.', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCS0VHRB4CvprlzT_EiRFPsPIpHBBGD0r36xV3bjShS9mD-6zaG4u55R5BzIkenJGNnLqZz4cly9CmtVOZkALnTSzkwHEht2Xinzm6Yuo6i_g5SJ0Bo0ZL_s_KHTQ5GejvxM9JTlLh1i3J_VUyCRdlxxWj95qlOFy1B7VBYk-4Zn1QCfq_tAwimHzmaAdj6QpyIfSPsJP033CXthIQuW-UZnfOrABv2OTeUJpHwgncp-ulXWbu9-k20TIRBv87rkkdOf4mOpRTF4efa' },
+            { id: 'office-minimalist', title: 'Office Minimalist', description: 'Commanding presence through simplicity with a sharp-shouldered blazer over pleated midi skirt.', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAiPaLAe3nAW1rJwNgkmaZ0hGIehH201D_KtzNw623roCMaO8VSI44MIc-e8AT-d1RMKccGI8P9RqjaXLvr2Ya8RzaNgLxilgyJfbjxtoHSgphZ4hqsLF9-erqKPmeou1qQ6XAWmVOTQeIJpoFArZIrC2yUpft5QNudI6nZ2J5a6buqyY6JSOB_tEOVbvDFaBwpqe7dOujDt9OzO-3OZW9qwYAIUTM9rdfjrbWlVhMUxvdMLxes7qahvLxso-HxvLebAJrl2mBmgAuD' },
+            { id: 'evening-editorial', title: 'Evening Editorial', description: 'Late-night elegance reimagined with a bias-cut silk slip dress and structured leather boots.', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCQymJmio_BDaL8KqgHlPaZb9FkLOqJ9hdVs8cLzSWPxlBKLMyhtQStzeAfQeJ8E4HQZ44j-9HgExkaa8ceuefb7RyL61LYTkxyY4x_WBS3b0aMUHYKt9c5CTxgGWs8psZTkjjpNGnRQU7smXAgMXEJt_ijd5benNMdkJ20Wtdp0bPHF6-jRjGeeZQiuuWabt9C8S91eCLLw4dxj1FVOm5-1hCIBBsD4qCv2rDAUPMOhIWR61is8N39rvdJjNtGw6gdGswwv5OYBNMB' }
+        ],
+        categories: ['All Items', 'Knits', 'Outerwear', 'Silk', 'Shoes'],
+        palette: [
+            { color: '#1a1a1a', percentage: 32, name: 'Noir' },
+            { color: '#F3EFE0', percentage: 24, name: 'Ecru' },
+            { color: '#1F2937', percentage: 18, name: 'Navy' },
+            { color: '#C27A65', percentage: 12, name: 'Clay' }
+        ],
+        styleOptions: [
+            { id: 'parisian-chic', label: 'Parisian Chic', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAp8RlXUNRhHOlowM9xw6g76CjPNkobYuEnj-1jJGohUoSS8l6Xev6oUVF0rwL50rwMcgc_yTffIZKe3ka_YsHjlUsJBQj4dQEaUm4nljjnA80NL6Xt5WjQsZ-FQELKrDTfEF6tjHvD21PHy9IVWhnLqoK5CC56PIEKno1V31FU9P5a6JN_u3ZNYAD1ecxPhD6x6s02Aj2WXQG1XeVQ9fMR2TDe-GmzBqHtP0RPBpFZO5tVXn3O25X6ga2VNR-BV2vOA1H6R3Q1fXZR' },
+            { id: 'minimalist', label: 'Minimalist', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA3O7gaqatTnRvfcwJCa-iBXsTQ6WL4qagsSeAohlyuoCqjloY2TfWy9mxeAqunJhqMZsKqFWjPRyRvanPBQ3i2mSZunugBzHYwagiMTK2bqjFNS320iEJnZLqjAtDuVNdjQspslHM-jnysnWM6F1lR5IGQf8eeuwBu2EcxzzZE02HYM9VYAcF7X2kkpMAwNfrVXcC4-2mZ-BqaEZ5Go-jdkNiyvIt9pQAfSbXT8IQMrD7UMUDTI0-VI67nXTlhgOynleu9Ew0FVALV' },
+            { id: 'soft-textures', label: 'Soft Textures', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBG1mpqFEr3sgDhMFpMao9SudPe3m8ijh_edHFHHQY_sq8kN4FPtbAXOxZt_UTnDbTfMM-IsBNxnBt6B05_PQTpm00oAOMlnPyOYLZM19qXGQFiGC3qhIEFrgf30dFO1-zERDxODxvctGuM98sUVt2ksogNdH15CWBAVx8ghXn9l1hMMHhdesEmrR8ZegZU1m53EBfdmp7ckYwFCETzG-VAIPwnyjSeKS45vClDVLe5e2XvKVeJ5MgC_OHpqWLO3NuOL94CWiT3eWMA' },
+            { id: 'avant-garde', label: 'Avant Garde', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBfnrT_sPeWCRHzRGWz_pRjP7HUIpOpgPt_JKYl28GvyaVjx1n9Cl0TOQdsx5uhiul0oKXPviHFPvzZqYbkwMLiYhWVpqWpQQ6UHC_SHfoUq1J7FomePHy25EkefX3lU5W5ylQ7Wg2VbjOu0Qln0FuHYwMoIV0fraB1Rj7akYT71DqBC2VZnFAmYgHTt-zM2-uPc0Wjt4Rw8mKNkLp7S5AQO5MVUDihDCkA3GqJwG_SeXV4uXpOEVNG7CL8puVSvjHpbxuZFrKkzxUA' },
+            { id: 'bohemian', label: 'Bohemian', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCqurwlvFV44hMELHMWTMmf99qk1VhN7j7zJvSPg1vYDMxO78csrQeiIWhn1dDwq4mhqBK-yC1G6oJRJPbT1GRcrTYz_G126fl2jJDlKzb0Zku0Ppck3lp1OHG9KIfJdN1xC-RI4NDylncwxQmGsDvv91g_dPWkNBdZB9C4vfvRW9hQoUITOEvLf-EuQmpM6yWkWqWH410ml4ddnnmQWa7lQunnQ8zygIqscQS__sND8sAkVArI7PAZzbZXBmCMfaOB5DXc3Nm1NxP9' },
+            { id: 'classic', label: 'Classic', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAeCCNAwsgQrBeW7Vwzm2Wf9NqsYWQvvIMwW0ANOb_F-FnZN6G0szyTS6E0kegkJ1tQY7eSwy_2fd40APNxH3qNUzbG_jhPcfrXPrBlMux2xJ-dgBxn_TwSchLS3HzOgsOTvQyheQ23PbSfU-G-Sz7KD2uVYqCBsiMtks2wBX3hRMJmuVibURD2zhejC1G2_XA16ppE-p9VF9pCpImbMBa3x6hn824d2mD5FfKcFGzuiA0m6dZg7pCvANiLhQCMsodcIlQ2yoh2A6er' }
+        ]
+    },
+
+    toggleFavorite(id) {
+        if (this.state.favorites.has(id)) this.state.favorites.delete(id);
+        else this.state.favorites.add(id);
+        Router.handleRouteChange();
+    },
+
+    isFavorite(id) { return this.state.favorites.has(id); },
+
+    setClosetFilter(f) { this.state.closetFilter = f; Router.handleRouteChange(); },
+
+    selectStyleOption(step, id) {
+        this.state.styleDNA.selections[step] = id;
+        document.querySelectorAll('.quiz-option').forEach(el => el.classList.remove('selected'));
+        const sel = document.querySelector(`[data-option="${id}"]`);
+        if (sel) sel.querySelector('.quiz-option').classList.add('selected');
+    },
+
+    nextStyleDNAStep() {
+        if (this.state.styleDNA.step < 5) { this.state.styleDNA.step++; Router.handleRouteChange(); }
+        else Router.navigate('/daily-edit');
+    },
+
+    prevStyleDNAStep() {
+        if (this.state.styleDNA.step > 1) { this.state.styleDNA.step--; Router.handleRouteChange(); }
+        else Router.navigate('/welcome');
+    }
+};
+
+// ============ COMPONENTS ============
+const Components = {
+    bottomNav(active) {
+        const items = [
+            { id: 'home', icon: 'home', route: '/daily-edit' },
+            { id: 'styling', icon: 'auto_fix_high', route: '/ai-outfit' },
+            { id: 'camera', icon: 'photo_camera', route: '/scan', center: true },
+            { id: 'closet', icon: 'checkroom', route: '/closet' },
+            { id: 'profile', icon: 'person', route: '/profile' }
+        ];
+        return `
+            <nav class="bottom-nav bg-white/95 backdrop-blur-xl border-t border-gray-100 px-8 py-4 flex justify-between items-center nav-shadow">
+                ${items.map(i => i.center ? `
+                    <button onclick="Router.navigate('${i.route}')" class="nav-item" data-nav="${i.id}">
+                        <div class="w-14 h-14 bg-black text-white rounded-full flex items-center justify-center -mt-10 camera-shadow">
+                            <span class="material-symbols-outlined text-[26px]">${i.icon}</span>
+                        </div>
+                    </button>
+                ` : `
+                    <button onclick="Router.navigate('${i.route}')" class="nav-item ${active === i.id ? 'text-black' : 'text-gray-400'}" data-nav="${i.id}">
+                        <span class="material-symbols-outlined text-[28px] ${active === i.id ? 'filled' : ''}">${i.icon}</span>
+                    </button>
+                `).join('')}
+            </nav>
+        `;
+    },
+
+    header(opts = {}) {
+        const { subtitle = '', showBack = false } = opts;
+        return `
+            <header class="sticky top-0 z-50 flex items-center bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 justify-between border-b border-gray-50">
+                <div class="w-10 flex justify-start">
+                    ${showBack ? `<button onclick="history.back()"><span class="material-symbols-outlined">arrow_back</span></button>`
+                    : `<button><span class="material-symbols-outlined">menu</span></button>`}
+                </div>
+                <div class="flex-1 text-center">
+                    <h1 class="brand-logo text-2xl font-medium">Stylistt</h1>
+                    ${subtitle ? `<p class="text-[10px] uppercase tracking-[0.3em] text-gray-400">${subtitle}</p>` : ''}
+                </div>
+                <div class="w-10 flex justify-end">
+                    <button onclick="Router.navigate('/shop')"><span class="material-symbols-outlined">shopping_bag</span></button>
+                </div>
+            </header>
+        `;
+    }
+};
+
+// ============ SCREENS ============
+const Screens = {
+    welcome() {
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white">
+                <header class="flex items-center justify-between px-6 pt-12 pb-4">
+                    <button class="p-2"><span class="material-symbols-outlined text-2xl">menu</span></button>
+                    <h1 class="brand-logo text-2xl font-medium">Stylistt</h1>
+                    <button class="p-2"><span class="material-symbols-outlined text-2xl">search</span></button>
+                </header>
+                <div class="relative mx-6 aspect-[3/4] bg-gray-100 overflow-hidden animate-fade-in">
+                    <img src="${App.data.lookbooks[0].image}" alt="Fashion" class="w-full h-full object-cover">
+                    <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1.5">
+                        <span class="text-[10px] uppercase tracking-[0.2em] font-medium">Collection 01</span>
+                    </div>
+                </div>
+                <div class="flex-1 px-6 pt-8 pb-6 animate-fade-in-up">
+                    <h2 class="brand-title text-4xl leading-tight mb-4">Your AI-Powered<br><span class="italic">Wardrobe Atelier.</span></h2>
+                    <p class="text-gray-500 text-sm leading-relaxed mb-8">Experience high-end personalization. Scan your collection to receive curated styling advice and exclusive outfit insights.</p>
+                    <button onclick="Router.navigate('/style-dna')" class="w-full bg-black text-white py-4 text-[11px] font-bold uppercase tracking-[0.2em] mb-4">Get Started</button>
+                    <button onclick="Router.navigate('/daily-edit')" class="w-full text-center text-[11px] uppercase tracking-[0.2em] text-gray-400 py-2">Existing User? Log In</button>
+                </div>
+            </div>
+        `;
+    },
+
+    styleDNA() {
+        const step = App.state.styleDNA.step;
+        const sel = App.state.styleDNA.selections[step];
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white">
+                <header class="flex items-center justify-between px-6 pt-12 pb-6">
+                    <button onclick="App.prevStyleDNAStep()" class="text-gray-400"><span class="material-symbols-outlined text-2xl">arrow_back</span></button>
+                    <h1 class="brand-logo text-2xl font-bold">Stylistt</h1>
+                    <button onclick="Router.navigate('/daily-edit')" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Skip</button>
+                </header>
+                <div class="px-6 mb-8">
+                    <div class="flex justify-between mb-2">
+                        <span class="text-[10px] font-bold uppercase tracking-[0.2em]">Style DNA</span>
+                        <span class="text-[10px] text-gray-400">0${step} / 05</span>
+                    </div>
+                    <div class="h-[2px] bg-gray-100"><div class="h-full bg-black transition-all" style="width:${step*20}%"></div></div>
+                </div>
+                <main class="flex-1 overflow-y-auto px-6 pb-32">
+                    <div class="mb-10 text-center">
+                        <h2 class="brand-title text-3xl italic mb-3">Which aesthetic resonates with you?</h2>
+                        <p class="text-xs text-gray-500">Select the imagery that best defines your aspirational wardrobe.</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        ${App.data.styleOptions.map(o => `
+                            <div class="cursor-pointer" onclick="App.selectStyleOption(${step},'${o.id}')" data-option="${o.id}">
+                                <div class="quiz-option relative aspect-[4/5] overflow-hidden bg-gray-50 ${sel===o.id?'selected':''}">
+                                    <img src="${o.image}" alt="${o.label}" class="w-full h-full object-cover ${sel===o.id?'':'grayscale opacity-80'} hover:grayscale-0 hover:opacity-100 transition-all">
+                                    ${sel===o.id?'<div class="absolute bottom-3 right-3 bg-black text-white rounded-full w-6 h-6 flex items-center justify-center"><span class="material-symbols-outlined text-[16px]">check</span></div>':''}
+                                </div>
+                                <p class="mt-3 text-center text-[10px] uppercase tracking-[0.2em] ${sel===o.id?'text-black font-medium':'text-gray-400'}">${o.label}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </main>
+                <div class="fixed bottom-0 left-0 right-0 max-w-[430px] mx-auto bg-white/95 backdrop-blur-sm border-t border-gray-100 p-6">
+                    <button onclick="App.nextStyleDNAStep()" class="w-full bg-black text-white py-4 flex items-center justify-center">
+                        <span class="text-[11px] font-bold uppercase tracking-[0.3em] mr-2">${step===5?'Complete':'Continue'}</span>
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    },
+
+    dailyEdit() {
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white pb-24">
+                ${Components.header({ subtitle: 'The Daily Edit' })}
+                <main class="flex-1 overflow-y-auto">
+                    <div class="px-6 pt-6 animate-fade-in">
+                        <div class="relative aspect-[3/4] bg-gray-100 overflow-hidden magazine-shadow">
+                            <img src="${App.data.lookbooks[0].image}" alt="Daily Edit" class="w-full h-full object-cover">
+                        </div>
+                    </div>
+                    <div class="px-6 pt-6 animate-fade-in-up">
+                        <div class="flex justify-between mb-4">
+                            <span class="text-[10px] uppercase tracking-[0.2em] text-gray-400">Volume III / No. 03</span>
+                            <span class="text-[10px] uppercase tracking-[0.2em] text-gray-400">24 Oct 2024</span>
+                        </div>
+                        <h2 class="brand-title text-5xl italic mb-4">The Modern</h2>
+                        <h3 class="brand-title text-3xl italic text-gray-500 mb-6">Wardrobe Edit</h3>
+                        <p class="text-sm text-gray-500 mb-8">Explore this season's essential pieces curated for the contemporary woman.</p>
+                    </div>
+                    <div class="px-6 grid grid-cols-2 gap-4 mb-8">
+                        <button onclick="Router.navigate('/lookbooks')" class="flex items-center justify-center gap-2 py-4 border border-black hover:bg-black hover:text-white transition-all">
+                            <span class="material-symbols-outlined">auto_awesome</span>
+                            <span class="text-[11px] font-bold uppercase tracking-wider">Lookbooks</span>
+                        </button>
+                        <button onclick="Router.navigate('/insights')" class="flex items-center justify-center gap-2 py-4 border border-black hover:bg-black hover:text-white transition-all">
+                            <span class="material-symbols-outlined">insights</span>
+                            <span class="text-[11px] font-bold uppercase tracking-wider">Insights</span>
+                        </button>
+                    </div>
+                    <div class="px-6 mb-8">
+                        <div class="bg-soft-gray p-6">
+                            <span class="text-[10px] uppercase tracking-wider text-gray-400">Current Archetype</span>
+                            <h4 class="brand-title text-2xl italic mb-2">${App.state.user.archetype}</h4>
+                            <p class="text-xs text-gray-500">Your style favors structured silhouettes and neutral tones.</p>
+                        </div>
+                    </div>
+                </main>
+                ${Components.bottomNav('home')}
+            </div>
+        `;
+    },
+
+    lookbooks() {
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white pb-24">
+                ${Components.header({})}
+                <main class="flex-1 overflow-y-auto">
+                    <div class="px-6 py-10">
+                        <p class="text-[10px] uppercase tracking-[0.4em] text-gray-400 mb-2">Personal Curation</p>
+                        <h2 class="brand-title text-4xl italic">Curated Lookbooks</h2>
+                    </div>
+                    <div class="flex flex-col gap-16 px-6 pb-8">
+                        ${App.data.lookbooks.map(look => `
+                            <article class="animate-fade-in-up">
+                                <div class="relative aspect-[3/4] bg-gray-100 overflow-hidden mb-6">
+                                    <img src="${look.image}" alt="${look.title}" class="w-full h-full object-cover">
+                                    <button onclick="App.toggleFavorite('${look.id}')" class="absolute top-4 right-4 heart-btn bg-white/90 p-2 rounded-full ${App.isFavorite(look.id)?'active':''}">
+                                        <span class="material-symbols-outlined text-[20px]">favorite</span>
+                                    </button>
+                                </div>
+                                <h3 class="brand-title text-[28px] font-bold mb-3">${look.title}</h3>
+                                <p class="text-gray-500 text-sm mb-6">${look.description}</p>
+                                <div class="flex gap-4">
+                                    <button onclick="Router.navigate('/lookbook/${look.id}')" class="flex-1 bg-black text-white py-4 text-[11px] font-bold uppercase tracking-[0.2em]">Wear Today</button>
+                                    <button onclick="App.toggleFavorite('${look.id}')" class="flex-1 border border-black py-4 text-[11px] font-bold uppercase tracking-[0.2em] hover:bg-black hover:text-white transition-all">Save Look</button>
+                                </div>
+                            </article>
+                        `).join('')}
+                    </div>
+                </main>
+                ${Components.bottomNav('home')}
+            </div>
+        `;
+    },
+
+    closet() {
+        const cats = App.data.categories;
+        const filter = App.state.closetFilter;
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white pb-24">
+                <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
+                    <div class="flex items-center justify-between">
+                        <button><span class="material-symbols-outlined">menu</span></button>
+                        <div class="text-center">
+                            <h1 class="brand-logo text-2xl font-medium">Stylistt</h1>
+                            <p class="text-[10px] uppercase tracking-[0.3em] text-gray-400">My Closet</p>
+                        </div>
+                        <button><span class="material-symbols-outlined">add</span></button>
+                    </div>
+                </header>
+                <div class="sticky top-[88px] z-40 bg-white border-b border-gray-100">
+                    <div class="flex gap-6 px-6 overflow-x-auto">
+                        ${cats.map(c => `
+                            <button onclick="App.setClosetFilter('${c}')" class="py-4 text-sm whitespace-nowrap ${filter===c?'text-black font-medium border-b-2 border-black':'text-gray-400'}">${c}</button>
+                        `).join('')}
+                    </div>
+                </div>
+                <main class="flex-1 p-6">
+                    <div class="grid grid-cols-2 gap-4">
+                        ${[1,2,3,4,5,6].map(i => `
+                            <div class="animate-fade-in-up">
+                                <div class="relative bg-soft-gray aspect-square mb-3 flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-[48px] text-gray-300">checkroom</span>
+                                </div>
+                                <p class="text-[10px] text-gray-400 uppercase tracking-wider">Stylistt</p>
+                                <p class="text-xs font-medium uppercase tracking-wider">Sample Item ${i}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <p class="text-center py-8 text-[10px] uppercase tracking-[0.2em] text-gray-400">End of Collection</p>
+                </main>
+                ${Components.bottomNav('closet')}
+            </div>
+        `;
+    },
+
+    aiOutfit() {
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white pb-24">
+                <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
+                    <div class="flex items-center justify-between">
+                        <button><span class="material-symbols-outlined">menu</span></button>
+                        <div class="text-center">
+                            <h1 class="brand-logo text-2xl font-medium italic">Stylistt</h1>
+                            <p class="text-[10px] uppercase tracking-[0.3em] text-gray-400">AI Outfit Generator</p>
+                        </div>
+                        <button onclick="Router.navigate('/shop')"><span class="material-symbols-outlined">shopping_bag</span></button>
+                    </div>
+                </header>
+                <div class="border-b border-gray-100">
+                    <div class="flex gap-6 px-6 overflow-x-auto">
+                        <button class="py-4 border-b-2 border-black"><span class="brand-title text-lg italic">Parisian Dinner</span></button>
+                        <button class="py-4 text-gray-400"><span class="brand-title text-lg italic">Sunday Brunch</span></button>
+                        <button class="py-4 text-gray-400"><span class="brand-title text-lg italic">Art Gallery</span></button>
+                    </div>
+                </div>
+                <main class="flex-1 px-6 py-6">
+                    <div class="relative aspect-[3/4] bg-gray-100 mb-6 overflow-hidden animate-fade-in">
+                        <img src="${App.data.lookbooks[0].image}" alt="Generated Outfit" class="w-full h-full object-cover">
+                        <div class="absolute bottom-4 left-4 text-white">
+                            <p class="text-[10px] uppercase tracking-wider opacity-80">Look Match</p>
+                            <p class="text-4xl font-light">98%</p>
+                        </div>
+                        <button class="absolute bottom-4 right-4"><span class="material-symbols-outlined text-[28px] text-white">favorite_border</span></button>
+                    </div>
+                    <div class="flex justify-center gap-4 mb-8">
+                        <button class="flex flex-col items-center gap-2 p-4">
+                            <div class="w-12 h-12 border border-gray-200 rounded-full flex items-center justify-center"><span class="material-symbols-outlined">checkroom</span></div>
+                            <span class="text-[10px] uppercase tracking-wider text-gray-500">Swap Top</span>
+                        </button>
+                        <button class="flex flex-col items-center gap-2 p-4 bg-black text-white rounded-lg">
+                            <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center"><span class="material-symbols-outlined">autorenew</span></div>
+                            <span class="text-[10px] uppercase tracking-wider">Regenerate</span>
+                        </button>
+                        <button class="flex flex-col items-center gap-2 p-4">
+                            <div class="w-12 h-12 border border-gray-200 rounded-full flex items-center justify-center"><span class="material-symbols-outlined">expand_more</span></div>
+                            <span class="text-[10px] uppercase tracking-wider text-gray-500">Swap Bottom</span>
+                        </button>
+                    </div>
+                </main>
+                ${Components.bottomNav('styling')}
+            </div>
+        `;
+    },
+
+    scan() {
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white">
+                <header class="flex items-center justify-between px-6 pt-12 pb-4">
+                    <button onclick="history.back()"><span class="material-symbols-outlined">close</span></button>
+                    <h1 class="brand-logo text-xl font-medium">Stylistt</h1>
+                    <button><span class="material-symbols-outlined">bolt</span></button>
+                </header>
+                <div class="px-6 py-4">
+                    <h2 class="brand-title text-2xl mb-2">01 <span class="font-normal">Front</span></h2>
+                    <div class="flex gap-2">
+                        <div class="flex-1 h-[3px] bg-black"></div>
+                        <div class="flex-1 h-[3px] bg-gray-200"></div>
+                        <div class="flex-1 h-[3px] bg-gray-200"></div>
+                    </div>
+                </div>
+                <div class="flex-1 px-6 py-4">
+                    <div class="relative aspect-[3/4] bg-gray-100 overflow-hidden flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[80px] text-gray-300">photo_camera</span>
+                        <div class="absolute inset-8 border-2 border-dashed border-black/30 rounded-lg"></div>
+                    </div>
+                    <div class="flex justify-center py-8">
+                        <button onclick="Router.navigate('/scan/results')" class="w-20 h-20 bg-black rounded-full flex items-center justify-center camera-shadow">
+                            <div class="w-16 h-16 border-4 border-white rounded-full"></div>
+                        </button>
+                    </div>
+                    <div class="flex justify-center gap-4">
+                        <div class="w-16 h-20 border-2 border-black flex flex-col items-center justify-center bg-black text-white">
+                            <span class="material-symbols-outlined text-[20px]">add</span>
+                            <span class="text-[8px] uppercase">Front</span>
+                        </div>
+                        <div class="w-16 h-20 border border-gray-200 flex items-center justify-center text-gray-400">
+                            <span class="text-[8px] uppercase">Back</span>
+                        </div>
+                        <div class="w-16 h-20 border border-gray-200 flex items-center justify-center text-gray-400">
+                            <span class="text-[8px] uppercase">Label</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    scanResults() {
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white">
+                <header class="flex items-center justify-between px-6 pt-12 pb-4">
+                    <button onclick="history.back()" class="w-10 h-10 flex items-center justify-center rounded-full border border-gray-200"><span class="material-symbols-outlined text-[20px]">arrow_back</span></button>
+                    <div class="bg-soft-gray px-4 py-2 rounded-full"><span class="text-[10px] uppercase tracking-wider">Scan Results</span></div>
+                    <button class="w-10 h-10 flex items-center justify-center rounded-full border border-gray-200"><span class="material-symbols-outlined text-[20px]">more_horiz</span></button>
+                </header>
+                <div class="flex-1 bg-gradient-to-b from-gray-100 to-white">
+                    <div class="h-64 flex items-center justify-center">
+                        <div class="w-48 h-60 bg-gray-200 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[48px] text-gray-400">checkroom</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-t-3xl -mt-4 px-6 pt-8 pb-8 animate-fade-in-up">
+                    <div class="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-6"></div>
+                    <div class="text-center mb-8">
+                        <h2 class="brand-title text-3xl italic mb-2">Trench Coat</h2>
+                        <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400">Item #8902-XJ</p>
+                    </div>
+                    <div class="space-y-4 mb-8">
+                        <div class="flex justify-between py-4 border-b border-gray-100">
+                            <span class="text-[10px] uppercase tracking-wider text-gray-400">Brand</span>
+                            <div class="text-right"><span class="block text-lg font-medium">Burberry</span><span class="text-[10px] uppercase text-accent-gold">Detected</span></div>
+                        </div>
+                        <div class="flex justify-between py-4 border-b border-gray-100">
+                            <span class="text-[10px] uppercase tracking-wider text-gray-400">Material</span>
+                            <span class="text-lg font-medium">Cotton Gabardine</span>
+                        </div>
+                    </div>
+                    <button onclick="Router.navigate('/closet')" class="w-full bg-accent-gold text-white py-4 flex items-center justify-center gap-2">
+                        <span class="text-[11px] font-bold uppercase tracking-wider">Confirm to Closet</span>
+                        <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    },
+
+    insights() {
+        const palette = App.data.palette;
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white pb-24">
+                ${Components.header({ subtitle: 'Wardrobe Insights' })}
+                <main class="flex-1 overflow-y-auto">
+                    <div class="px-6 py-12 text-center animate-fade-in">
+                        <p class="text-[10px] uppercase tracking-[0.3em] text-gray-400 mb-2">Total Items</p>
+                        <h2 class="text-7xl font-light mb-4">${App.state.user.totalItems}</h2>
+                        <div class="inline-flex items-center gap-2 px-4 py-2 bg-soft-gray rounded-full">
+                            <span class="material-symbols-outlined text-[16px] text-green-500">trending_up</span>
+                            <span class="text-sm text-green-600">+12 this month</span>
+                        </div>
+                    </div>
+                    <div class="px-6 py-8 border-t border-gray-100 animate-fade-in-up">
+                        <div class="flex justify-between mb-6">
+                            <h3 class="brand-title text-2xl italic">Signature Palette</h3>
+                            <span class="text-[10px] uppercase tracking-wider text-gray-400">Most Worn</span>
+                        </div>
+                        <div class="flex justify-between mb-6">
+                            ${palette.map(p => `
+                                <div class="flex flex-col items-center">
+                                    <div class="w-16 h-16 rounded-full flex items-center justify-center mb-2 palette-circle" style="background:${p.color}">
+                                        <span class="text-xs font-medium ${p.color==='#F3EFE0'?'text-black':'text-white'}">${p.percentage}%</span>
+                                    </div>
+                                    <span class="text-[10px] uppercase tracking-wider text-gray-500">${p.name}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <p class="text-sm text-gray-500 text-center">Your wardrobe is defined by <span class="text-black font-medium">Noir</span> and <span class="text-black font-medium">Ecru</span>.</p>
+                    </div>
+                </main>
+                ${Components.bottomNav('home')}
+            </div>
+        `;
+    },
+
+    profile() {
+        const user = App.state.user;
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white pb-24">
+                <header class="sticky top-0 z-50 bg-white pt-12 pb-4 px-6">
+                    <div class="flex items-center justify-between">
+                        <h1 class="brand-logo text-2xl font-medium">Stylistt</h1>
+                        <div class="flex gap-4">
+                            <button><span class="material-symbols-outlined">notifications</span></button>
+                            <button><span class="material-symbols-outlined">settings</span></button>
+                        </div>
+                    </div>
+                </header>
+                <div class="px-6 py-8 bg-soft-gray animate-fade-in">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h2 class="brand-title text-4xl font-medium mb-1">${user.name}</h2>
+                            <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400">Personal Atelier</p>
+                        </div>
+                        <div class="w-20 h-20 bg-gray-200 rounded-sm flex items-center justify-center">
+                            <span class="text-2xl font-light text-gray-400">${user.initials}</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 mt-8">
+                        <div class="bg-white p-6 text-center">
+                            <span class="block text-4xl font-light mb-1">${user.piecesScanned}</span>
+                            <span class="text-[10px] uppercase tracking-[0.2em] text-gray-400">Pieces Scanned</span>
+                        </div>
+                        <div class="bg-white p-6 text-center">
+                            <span class="block text-4xl font-light mb-1">${user.looksCreated}</span>
+                            <span class="text-[10px] uppercase tracking-[0.2em] text-gray-400">Looks Created</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex-1 px-6 py-6">
+                    <div class="space-y-0 divide-y divide-gray-100">
+                        <button class="w-full flex items-center justify-between py-5">
+                            <div class="flex items-center gap-4">
+                                <span class="material-symbols-outlined text-gray-600">tune</span>
+                                <span class="text-sm font-medium uppercase tracking-wider">Style Preferences</span>
+                            </div>
+                            <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+                        </button>
+                        <button class="w-full flex items-center justify-between py-5">
+                            <div class="flex items-center gap-4">
+                                <span class="material-symbols-outlined text-gray-600">person</span>
+                                <span class="text-sm font-medium uppercase tracking-wider">Account Details</span>
+                            </div>
+                            <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+                        </button>
+                        <button onclick="Router.navigate('/lookbooks')" class="w-full flex items-center justify-between py-5">
+                            <div class="flex items-center gap-4">
+                                <span class="material-symbols-outlined text-gray-600">favorite</span>
+                                <span class="text-sm font-medium uppercase tracking-wider">Saved Items</span>
+                            </div>
+                            <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+                        </button>
+                    </div>
+                    <div class="mt-8 bg-black text-white p-6">
+                        <h3 class="brand-title text-xl font-medium mb-2">Stylistt Pro</h3>
+                        <p class="text-sm text-gray-300 mb-4">Unlock unlimited AI outfit generations.</p>
+                        <button class="text-[11px] font-bold uppercase tracking-wider border-b border-white pb-1">Upgrade Now</button>
+                    </div>
+                </div>
+                ${Components.bottomNav('profile')}
+            </div>
+        `;
+    },
+
+    shop() {
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white pb-24">
+                ${Components.header({ subtitle: 'Curated Shop' })}
+                <main class="flex-1 overflow-y-auto">
+                    <div class="px-6 py-8 text-center animate-fade-in">
+                        <h2 class="brand-title text-3xl italic mb-3">Completes Your Look</h2>
+                        <p class="text-sm text-gray-500">Pieces hand-picked by our AI stylist to harmonize with your wardrobe.</p>
+                    </div>
+                    <div class="px-6 mb-8 animate-fade-in-up">
+                        <div class="relative aspect-[3/4] bg-gray-100 overflow-hidden magazine-shadow">
+                            <div class="absolute top-4 left-4 bg-white px-3 py-1"><span class="text-[10px] uppercase tracking-wider font-medium">Best Match</span></div>
+                            <img src="${App.data.lookbooks[0].image}" alt="Featured Item" class="w-full h-full object-cover">
+                            <button class="absolute bottom-4 right-4 bg-white/90 p-3 rounded-full"><span class="material-symbols-outlined">add_shopping_cart</span></button>
+                        </div>
+                        <div class="mt-4">
+                            <p class="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Outerwear</p>
+                            <h3 class="brand-title text-xl italic">The Structured Wool Coat</h3>
+                        </div>
+                    </div>
+                </main>
+                ${Components.bottomNav('home')}
+            </div>
+        `;
+    },
+
+    lookbookDetail(params) {
+        const look = App.data.lookbooks.find(l => l.id === params.id) || App.data.lookbooks[0];
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white">
+                ${Components.header({ subtitle: 'Lookbook Detail', showBack: true })}
+                <main class="flex-1">
+                    <div class="aspect-[3/4] bg-gray-100 overflow-hidden animate-fade-in">
+                        <img src="${look.image}" alt="${look.title}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="px-6 py-8 animate-fade-in-up">
+                        <div class="inline-block bg-soft-gray px-3 py-1 mb-4">
+                            <span class="text-[10px] uppercase tracking-wider">Fall / Winter 2024</span>
+                        </div>
+                        <h2 class="brand-title text-4xl italic mb-4">The ${look.title.split(' ')[0]}<br>Edit</h2>
+                        <p class="text-gray-500 text-sm mb-8">${look.description}</p>
+                        <div class="flex gap-4">
+                            <button class="flex-1 flex items-center justify-center gap-2 py-4 border border-black hover:bg-black hover:text-white transition-all">
+                                <span class="material-symbols-outlined">calendar_today</span>
+                                <span class="text-[11px] font-bold uppercase tracking-wider">Add to Calendar</span>
+                            </button>
+                            <button class="flex-1 flex items-center justify-center gap-2 py-4 bg-black text-white">
+                                <span class="material-symbols-outlined">checkroom</span>
+                                <span class="text-[11px] font-bold uppercase tracking-wider">Wear Today</span>
+                            </button>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        `;
+    }
+};
+
+// ============ INIT ============
+Router.register('/welcome', Screens.welcome);
+Router.register('/style-dna', Screens.styleDNA);
+Router.register('/daily-edit', Screens.dailyEdit);
+Router.register('/lookbooks', Screens.lookbooks);
+Router.register('/closet', Screens.closet);
+Router.register('/ai-outfit', Screens.aiOutfit);
+Router.register('/scan', Screens.scan);
+Router.register('/scan/results', Screens.scanResults);
+Router.register('/insights', Screens.insights);
+Router.register('/profile', Screens.profile);
+Router.register('/shop', Screens.shop);
+Router.register('/lookbook/:id', Screens.lookbookDetail);
+Router.init();
+</script>
+</body>
+</html>
