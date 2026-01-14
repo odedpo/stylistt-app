@@ -1811,11 +1811,25 @@ const Screens = {
         `;
 
         try {
+            // Strip out base64 images - only send metadata to AI
+            const itemsForAI = App.state.closetItems.map(item => ({
+                id: item.id,
+                name: item.name,
+                category: item.category,
+                type: item.type,
+                color: item.color,
+                colorFamily: item.colorFamily,
+                material: item.material,
+                styleTags: item.styleTags,
+                occasions: item.occasions,
+                seasons: item.seasons
+            }));
+
             const response = await fetch('/api/generate-outfit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    closetItems: App.state.closetItems,
+                    closetItems: itemsForAI,
                     occasion: occasion,
                     styleDNA: App.state.user?.styleDNA || {}
                 })
