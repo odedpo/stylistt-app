@@ -1816,7 +1816,7 @@ const Screens = {
                             <span class="material-symbols-outlined">pending</span>
                             <span>Writing styling advice</span>
                         </div>
-                        <div id="step-model" class="hidden flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1.5s">
+                        <div id="step-model" class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1.5s">
                             <span class="material-symbols-outlined">pending</span>
                             <span>Generating model shot</span>
                         </div>
@@ -1899,10 +1899,7 @@ const Screens = {
                 if (item) outfitItemsWithImages.push(item);
             }
 
-            // Model shot generation disabled - Gemini quota exhausted
-            // TODO: Re-enable when Gemini billing is set up
-            // To enable: uncomment the block below
-            /*
+            // Generate model shot with Gemini
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 45000);
@@ -1933,7 +1930,6 @@ const Screens = {
             } catch (modelError) {
                 console.warn('Model generation failed:', modelError.message);
             }
-            */
 
             updateStep('step-model', 'done');
             App.state.currentGeneratedOutfit = outfit;
