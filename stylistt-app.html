@@ -1673,6 +1673,17 @@ const Screens = {
                         </button>
                     </div>
 
+                    ${currentOutfit.modelImage ? `
+                    <!-- Model Shot -->
+                    <div class="mb-6 rounded-lg overflow-hidden bg-gray-50 relative">
+                        <img src="${currentOutfit.modelImage}" alt="Outfit on model" class="w-full aspect-[3/4] object-cover">
+                        <div class="absolute top-3 left-3 bg-black/70 text-white px-3 py-1 rounded-full flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[16px]">auto_awesome</span>
+                            <span class="text-[10px] uppercase tracking-wider font-medium">AI Generated</span>
+                        </div>
+                    </div>
+                    ` : ''}
+
                     <!-- Outfit Items Grid -->
                     <div class="grid grid-cols-2 gap-4 mb-6">
                         ${topItem ? `
@@ -1792,18 +1803,22 @@ const Screens = {
                     </div>
                     <h2 class="brand-title text-2xl italic mb-2">Creating Your Look</h2>
                     <p class="text-sm text-gray-500 mb-4">Our AI is curating the perfect outfit for <span class="font-medium">${occasion}</span>...</p>
-                    <div class="space-y-2 text-left max-w-[200px] mx-auto">
-                        <div class="flex items-center gap-3 text-sm text-gray-600 animate-pulse">
+                    <div id="outfit-progress" class="space-y-2 text-left max-w-[220px] mx-auto">
+                        <div id="step-analyze" class="flex items-center gap-3 text-sm text-gray-600 animate-pulse">
                             <span class="material-symbols-outlined text-accent-gold">check_circle</span>
                             <span>Analyzing your closet</span>
                         </div>
-                        <div class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 0.5s">
+                        <div id="step-match" class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 0.5s">
                             <span class="material-symbols-outlined">pending</span>
                             <span>Matching colors & styles</span>
                         </div>
-                        <div class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1s">
+                        <div id="step-advice" class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1s">
                             <span class="material-symbols-outlined">pending</span>
                             <span>Writing styling advice</span>
+                        </div>
+                        <div id="step-model" class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1.5s">
+                            <span class="material-symbols-outlined">pending</span>
+                            <span>Generating model shot</span>
                         </div>
                     </div>
                 </div>
@@ -1811,6 +1826,23 @@ const Screens = {
         `;
 
         try {
+            // Helper to update progress steps
+            const updateStep = (stepId, status) => {
+                const el = document.getElementById(stepId);
+                if (!el) return;
+                const icon = el.querySelector('.material-symbols-outlined');
+                if (status === 'done') {
+                    el.classList.remove('text-gray-400');
+                    el.classList.add('text-gray-600');
+                    icon.textContent = 'check_circle';
+                    icon.classList.add('text-accent-gold');
+                } else if (status === 'active') {
+                    el.classList.remove('text-gray-400');
+                    el.classList.add('text-gray-600');
+                    icon.textContent = 'pending';
+                }
+            };
+
             // Strip out base64 images - only send metadata to AI
             const itemsForAI = App.state.closetItems.map(item => ({
                 id: item.id,
@@ -1824,6 +1856,8 @@ const Screens = {
                 occasions: item.occasions,
                 seasons: item.seasons
             }));
+
+            updateStep('step-match', 'active');
 
             const response = await fetch('/api/generate-outfit', {
                 method: 'POST',
@@ -1840,6 +1874,60 @@ const Screens = {
             }
 
             const outfit = await response.json();
+            updateStep('step-match', 'done');
+            updateStep('step-advice', 'done');
+            updateStep('step-model', 'active');
+
+            // Collect the outfit items with their images for Gemini
+            const getItem = (id) => App.state.closetItems.find(item => item.id === id);
+            const outfitItemsWithImages = [];
+
+            if (outfit.outfit?.top) {
+                const item = getItem(outfit.outfit.top);
+                if (item) outfitItemsWithImages.push(item);
+            }
+            if (outfit.outfit?.bottom) {
+                const item = getItem(outfit.outfit.bottom);
+                if (item) outfitItemsWithImages.push(item);
+            }
+            if (outfit.outfit?.outerwear) {
+                const item = getItem(outfit.outfit.outerwear);
+                if (item) outfitItemsWithImages.push(item);
+            }
+            if (outfit.outfit?.shoes) {
+                const item = getItem(outfit.outfit.shoes);
+                if (item) outfitItemsWithImages.push(item);
+            }
+
+            // Generate model shot with Gemini
+            try {
+                const modelResponse = await fetch('/api/enhance-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'generate-outfit-model',
+                        outfitItems: outfitItemsWithImages.map(item => ({
+                            name: item.name,
+                            category: item.category,
+                            type: item.type,
+                            color: item.color,
+                            image: item.image
+                        })),
+                        occasion: occasion
+                    })
+                });
+
+                if (modelResponse.ok) {
+                    const modelData = await modelResponse.json();
+                    if (modelData.modelImage) {
+                        outfit.modelImage = modelData.modelImage;
+                    }
+                }
+            } catch (modelError) {
+                console.warn('Model generation failed, continuing without model shot:', modelError);
+            }
+
+            updateStep('step-model', 'done');
             App.state.currentGeneratedOutfit = outfit;
             App.state.currentOccasion = occasion;
             Screens.aiOutfit();
@@ -1932,40 +2020,19 @@ const Screens = {
                 Screens.showScanProcessing();
 
                 try {
-                    // Run Claude analysis and Gemini model generation in parallel
-                    const [analysisResponse, modelResponse] = await Promise.all([
-                        // Claude: Analyze item
-                        fetch('/api/analyze-item', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ image: e.target.result })
-                        }),
-                        // Gemini: Generate model wearing the item
-                        fetch('/api/enhance-image', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ image: e.target.result, action: 'generate-model' })
-                        }).catch(err => {
-                            console.warn('Model generation failed:', err);
-                            return null;
-                        })
-                    ]);
+                    // Call Claude to analyze item
+                    const response = await fetch('/api/analyze-item', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: e.target.result })
+                    });
 
-                    if (!analysisResponse.ok) {
+                    if (!response.ok) {
                         throw new Error('Analysis failed');
                     }
 
-                    const analysis = await analysisResponse.json();
+                    const analysis = await response.json();
                     App.state.currentScanAnalysis = analysis;
-
-                    // Store model image if generated
-                    if (modelResponse && modelResponse.ok) {
-                        const modelData = await modelResponse.json();
-                        if (modelData.modelImage) {
-                            App.state.currentScanModelImage = modelData.modelImage;
-                        }
-                    }
-
                     Router.navigate('/scan/results');
 
                 } catch (error) {
@@ -1989,22 +2056,18 @@ const Screens = {
                     </div>
                     <h2 class="brand-title text-2xl italic mb-2">Analyzing Your Piece</h2>
                     <p class="text-sm text-gray-500 mb-8">Our AI is identifying fabric, color, and styling details...</p>
-                    <div class="space-y-2 text-left max-w-[220px] mx-auto">
+                    <div class="space-y-2 text-left max-w-[200px] mx-auto">
                         <div class="flex items-center gap-3 text-sm text-gray-600 animate-pulse">
                             <span class="material-symbols-outlined text-accent-gold">check_circle</span>
                             <span>Detecting category</span>
                         </div>
                         <div class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 0.5s">
                             <span class="material-symbols-outlined">pending</span>
-                            <span>Analyzing fabric & color</span>
+                            <span>Analyzing fabric</span>
                         </div>
                         <div class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1s">
                             <span class="material-symbols-outlined">pending</span>
-                            <span>Generating model shot</span>
-                        </div>
-                        <div class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1.5s">
-                            <span class="material-symbols-outlined">pending</span>
-                            <span>Writing styling notes</span>
+                            <span>Generating styling notes</span>
                         </div>
                     </div>
                 </div>

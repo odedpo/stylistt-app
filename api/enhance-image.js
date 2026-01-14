@@ -122,8 +122,89 @@ export default async function handler(req, res) {
                 description: textResponse
             });
 
+        } else if (action === 'generate-outfit-model') {
+            // Generate a model wearing a complete outfit
+            const { outfitItems, occasion } = req.body;
+
+            if (!outfitItems || !Array.isArray(outfitItems) || outfitItems.length === 0) {
+                return res.status(400).json({ error: 'No outfit items provided' });
+            }
+
+            const model = genAI.getGenerativeModel({
+                model: 'gemini-2.0-flash-exp',
+                generationConfig: {
+                    responseModalities: ['Text', 'Image']
+                }
+            });
+
+            // Build content array with all outfit item images
+            const contentParts = [];
+
+            for (const item of outfitItems) {
+                if (item.image) {
+                    let itemImageData = item.image;
+                    let itemMimeType = 'image/jpeg';
+
+                    if (item.image.startsWith('data:')) {
+                        const matches = item.image.match(/^data:([^;]+);base64,(.+)$/);
+                        if (matches) {
+                            itemMimeType = matches[1];
+                            itemImageData = matches[2];
+                        }
+                    }
+
+                    contentParts.push({
+                        inlineData: {
+                            mimeType: itemMimeType,
+                            data: itemImageData
+                        }
+                    });
+                }
+            }
+
+            // Build the outfit description
+            const outfitDescription = outfitItems
+                .map(item => `${item.name} (${item.category}): ${item.color} ${item.type || item.category}`)
+                .join(', ');
+
+            contentParts.push({
+                text: `Generate a high-fashion editorial photo of a stylish model wearing this complete outfit: ${outfitDescription}.
+
+The occasion is: ${occasion || 'everyday wear'}
+
+Requirements:
+- The model should be wearing ALL these clothing items together as a coordinated outfit
+- Posed elegantly in a full-body or 3/4 length shot
+- Clean, minimal background (white or neutral studio setting)
+- Style: luxury fashion magazine editorial, professional lighting
+- The clothing should look exactly like the items shown in the reference photos
+
+Generate the image.`
+            });
+
+            const result = await model.generateContent(contentParts);
+            const response = await result.response;
+
+            // Check if we got an image back
+            let modelImage = null;
+            let textResponse = '';
+
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    modelImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                } else if (part.text) {
+                    textResponse = part.text;
+                }
+            }
+
+            return res.status(200).json({
+                success: true,
+                modelImage: modelImage,
+                description: textResponse
+            });
+
         } else {
-            return res.status(400).json({ error: 'Invalid action. Use "remove-background" or "generate-model"' });
+            return res.status(400).json({ error: 'Invalid action. Use "remove-background", "generate-model", or "generate-outfit-model"' });
         }
 
     } catch (error) {
