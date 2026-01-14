@@ -1932,19 +1932,40 @@ const Screens = {
                 Screens.showScanProcessing();
 
                 try {
-                    // Call real AI analysis API
-                    const response = await fetch('/api/analyze-item', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ image: e.target.result })
-                    });
+                    // Run Claude analysis and Gemini model generation in parallel
+                    const [analysisResponse, modelResponse] = await Promise.all([
+                        // Claude: Analyze item
+                        fetch('/api/analyze-item', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ image: e.target.result })
+                        }),
+                        // Gemini: Generate model wearing the item
+                        fetch('/api/enhance-image', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ image: e.target.result, action: 'generate-model' })
+                        }).catch(err => {
+                            console.warn('Model generation failed:', err);
+                            return null;
+                        })
+                    ]);
 
-                    if (!response.ok) {
+                    if (!analysisResponse.ok) {
                         throw new Error('Analysis failed');
                     }
 
-                    const analysis = await response.json();
+                    const analysis = await analysisResponse.json();
                     App.state.currentScanAnalysis = analysis;
+
+                    // Store model image if generated
+                    if (modelResponse && modelResponse.ok) {
+                        const modelData = await modelResponse.json();
+                        if (modelData.modelImage) {
+                            App.state.currentScanModelImage = modelData.modelImage;
+                        }
+                    }
+
                     Router.navigate('/scan/results');
 
                 } catch (error) {
@@ -1968,18 +1989,22 @@ const Screens = {
                     </div>
                     <h2 class="brand-title text-2xl italic mb-2">Analyzing Your Piece</h2>
                     <p class="text-sm text-gray-500 mb-8">Our AI is identifying fabric, color, and styling details...</p>
-                    <div class="space-y-2 text-left max-w-[200px] mx-auto">
+                    <div class="space-y-2 text-left max-w-[220px] mx-auto">
                         <div class="flex items-center gap-3 text-sm text-gray-600 animate-pulse">
                             <span class="material-symbols-outlined text-accent-gold">check_circle</span>
                             <span>Detecting category</span>
                         </div>
                         <div class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 0.5s">
                             <span class="material-symbols-outlined">pending</span>
-                            <span>Analyzing fabric</span>
+                            <span>Analyzing fabric & color</span>
                         </div>
                         <div class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1s">
                             <span class="material-symbols-outlined">pending</span>
-                            <span>Generating styling notes</span>
+                            <span>Generating model shot</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1.5s">
+                            <span class="material-symbols-outlined">pending</span>
+                            <span>Writing styling notes</span>
                         </div>
                     </div>
                 </div>
@@ -1989,6 +2014,7 @@ const Screens = {
 
     scanResults() {
         const image = App.state.currentScanImage;
+        const modelImage = App.state.currentScanModelImage;
         const analysis = App.state.currentScanAnalysis || {};
 
         // Use AI analysis or fallback to defaults
@@ -2027,8 +2053,18 @@ const Screens = {
                     <button onclick="Screens.editScanAnalysis()" class="w-10 h-10 flex items-center justify-center rounded-full border border-gray-200 active:scale-90 transition-transform"><span class="material-symbols-outlined text-[20px]">edit</span></button>
                 </header>
                 <div class="flex-1 bg-gradient-to-b from-gray-100 to-white">
+                    <!-- Image Toggle -->
+                    ${modelImage ? `
+                        <div class="flex justify-center gap-2 pt-4 pb-2">
+                            <button id="btn-original" onclick="Screens.toggleScanImage('original')" class="px-4 py-2 text-[10px] uppercase tracking-wider bg-black text-white">Original</button>
+                            <button id="btn-model" onclick="Screens.toggleScanImage('model')" class="px-4 py-2 text-[10px] uppercase tracking-wider border border-gray-300 text-gray-500">On Model</button>
+                        </div>
+                    ` : ''}
                     <div class="h-64 flex items-center justify-center">
-                        ${image ? `<img src="${image}" alt="Scanned item" class="h-full w-auto object-contain rounded-lg shadow-lg">` : `
+                        ${image ? `
+                            <img id="scan-image-original" src="${image}" alt="Scanned item" class="h-full w-auto object-contain rounded-lg shadow-lg">
+                            ${modelImage ? `<img id="scan-image-model" src="${modelImage}" alt="Model wearing item" class="h-full w-auto object-contain rounded-lg shadow-lg hidden">` : ''}
+                        ` : `
                             <div class="w-48 h-60 bg-gray-200 flex items-center justify-center">
                                 <span class="material-symbols-outlined text-[48px] text-gray-400">checkroom</span>
                             </div>
@@ -2115,6 +2151,31 @@ const Screens = {
         Toast.show('Edit feature coming soon!', 'info');
     },
 
+    toggleScanImage(view) {
+        const originalImg = document.getElementById('scan-image-original');
+        const modelImg = document.getElementById('scan-image-model');
+        const btnOriginal = document.getElementById('btn-original');
+        const btnModel = document.getElementById('btn-model');
+
+        if (view === 'model' && modelImg) {
+            originalImg.classList.add('hidden');
+            modelImg.classList.remove('hidden');
+            btnOriginal.classList.remove('bg-black', 'text-white');
+            btnOriginal.classList.add('border', 'border-gray-300', 'text-gray-500');
+            btnModel.classList.add('bg-black', 'text-white');
+            btnModel.classList.remove('border', 'border-gray-300', 'text-gray-500');
+        } else {
+            originalImg.classList.remove('hidden');
+            if (modelImg) modelImg.classList.add('hidden');
+            btnOriginal.classList.add('bg-black', 'text-white');
+            btnOriginal.classList.remove('border', 'border-gray-300', 'text-gray-500');
+            if (btnModel) {
+                btnModel.classList.remove('bg-black', 'text-white');
+                btnModel.classList.add('border', 'border-gray-300', 'text-gray-500');
+            }
+        }
+    },
+
     confirmScan() {
         const analysis = App.state.currentScanAnalysis || {};
 
@@ -2133,11 +2194,13 @@ const Screens = {
             qualityTier: analysis.qualityTier || 'contemporary',
             stylingNotes: analysis.stylingNotes || '',
             image: App.state.currentScanImage,
+            modelImage: App.state.currentScanModelImage || null,
             scannedAt: new Date().toISOString()
         };
 
         App.addToCloset(item);
         App.state.currentScanImage = null;
+        App.state.currentScanModelImage = null;
         App.state.currentScanAnalysis = null;
         Router.navigate('/closet');
     },
