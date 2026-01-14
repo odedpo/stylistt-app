@@ -1900,33 +1900,44 @@ const Screens = {
             }
 
             // Generate model shot with Gemini 2.5 Flash Image
-            try {
-                console.log('Generating model shot...');
-                const modelResponse = await fetch('/api/enhance-image', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'generate-outfit-model',
-                        outfitItems: outfitItemsWithImages.map(item => ({
-                            name: item.name,
-                            category: item.category,
-                            type: item.type,
-                            color: item.color,
-                            material: item.material
-                        })),
-                        occasion: occasion
-                    })
-                });
+            console.log('Outfit items for model:', outfitItemsWithImages.length, outfitItemsWithImages.map(i => i.name));
 
-                if (modelResponse.ok) {
-                    const modelData = await modelResponse.json();
-                    console.log('Model response:', modelData.modelImage ? 'has image' : 'no image');
-                    if (modelData.modelImage) {
-                        outfit.modelImage = modelData.modelImage;
+            if (outfitItemsWithImages.length > 0) {
+                try {
+                    console.log('Calling enhance-image API...');
+                    const modelResponse = await fetch('/api/enhance-image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'generate-outfit-model',
+                            outfitItems: outfitItemsWithImages.map(item => ({
+                                name: item.name,
+                                category: item.category,
+                                type: item.type,
+                                color: item.color,
+                                material: item.material
+                            })),
+                            occasion: occasion
+                        })
+                    });
+
+                    console.log('enhance-image response status:', modelResponse.status);
+
+                    if (modelResponse.ok) {
+                        const modelData = await modelResponse.json();
+                        console.log('Model response:', modelData.modelImage ? 'has image' : 'no image');
+                        if (modelData.modelImage) {
+                            outfit.modelImage = modelData.modelImage;
+                        }
+                    } else {
+                        const errorData = await modelResponse.json().catch(() => ({}));
+                        console.error('enhance-image error:', errorData);
                     }
+                } catch (modelError) {
+                    console.error('Model generation failed:', modelError);
                 }
-            } catch (modelError) {
-                console.warn('Model generation failed:', modelError.message);
+            } else {
+                console.warn('No outfit items found for model generation');
             }
             App.state.currentGeneratedOutfit = outfit;
             App.state.currentOccasion = occasion;
