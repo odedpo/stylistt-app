@@ -57,7 +57,7 @@
         .heart-btn.active span { font-variation-settings: 'FILL' 1; color: #C5A059; }
         .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
         .material-symbols-outlined.filled { font-variation-settings: 'FILL' 1; }
-        .bottom-nav { position: fixed; bottom: 52px; left: 0; right: 0; max-width: 430px; margin: 0 auto; z-index: 50; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; max-width: 430px; margin: 0 auto; z-index: 50; }
         .quiz-option { transition: all 0.3s ease; border: 2px solid transparent; }
         .quiz-option.selected { border-color: black; }
         .palette-circle { border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
@@ -342,38 +342,55 @@ const App = {
         ],
         occasions: ['Parisian Dinner', 'Sunday Brunch', 'Art Gallery', 'Business Meeting', 'Date Night', 'Weekend Casual'],
 
-        // Subscription tiers for Organizerr
+        // Free tier limit
+        freeItemLimit: 5,
+
+        // Subscription tiers - reframed around transformation
         subscriptionTiers: [
             {
-                id: 'essential',
-                name: 'Essential',
-                price: 500,
-                priceLabel: '$500/year',
-                visits: 1,
+                id: 'free',
+                name: 'Free',
+                price: 0,
+                priceLabel: 'Free',
+                visits: 0,
                 aiLooksPerDay: 3,
                 lookbooksPerDay: 5,
-                features: ['1 professional organizer visit', '3 AI outfit suggestions per day', '5 lookbook views per day', 'Basic wardrobe analytics']
+                itemLimit: 5,
+                features: ['Scan up to 5 items yourself', '3 AI outfits per day', 'Browse lookbooks', 'Basic styling']
             },
             {
-                id: 'premium',
-                name: 'Premium',
+                id: 'transform',
+                name: 'Transform',
+                price: 500,
+                priceLabel: '$500',
+                visits: 1,
+                aiLooksPerDay: -1,
+                lookbooksPerDay: -1,
+                itemLimit: -1,
+                features: ['1 pro visit - full closet scan', 'Unlimited AI outfits', 'Unlimited lookbooks', 'Physical closet organization']
+            },
+            {
+                id: 'maintain',
+                name: 'Maintain',
                 price: 1200,
                 priceLabel: '$1,200/year',
                 visits: 2,
-                aiLooksPerDay: -1, // unlimited
+                aiLooksPerDay: -1,
                 lookbooksPerDay: -1,
+                itemLimit: -1,
                 popular: true,
-                features: ['2 professional organizer visits', 'Unlimited AI outfit suggestions', 'Unlimited lookbook access', 'Advanced wardrobe analytics', 'Priority booking']
+                features: ['2 visits per year', 'Seasonal wardrobe refresh', 'Unlimited AI outfits', 'Priority booking']
             },
             {
-                id: 'elite',
-                name: 'Elite',
+                id: 'concierge',
+                name: 'Concierge',
                 price: 2400,
                 priceLabel: '$2,400/year',
                 visits: 4,
                 aiLooksPerDay: -1,
                 lookbooksPerDay: -1,
-                features: ['4 quarterly organizer visits', 'Unlimited AI suggestions + Priority', 'Exclusive lookbook collections', 'Full wardrobe analytics suite', 'Direct organizer messaging', 'Seasonal refresh consultations']
+                itemLimit: -1,
+                features: ['4 quarterly visits', 'Dedicated personal organizer', 'Unlimited everything', 'White glove service']
             }
         ],
 
@@ -403,7 +420,7 @@ const App = {
             looksCreated: 0,
             totalItems: 0,
             subscription: {
-                tier: 'none',
+                tier: 'free',
                 startDate: null,
                 expiresAt: null,
                 visitsRemaining: 0,
@@ -445,7 +462,7 @@ const App = {
             looksCreated: 0,
             totalItems: 0,
             subscription: {
-                tier: 'none',
+                tier: 'free',
                 startDate: null,
                 expiresAt: null,
                 visitsRemaining: 0,
@@ -772,6 +789,22 @@ const App = {
     },
 
     addToCloset(item) {
+        // Check free tier limit
+        const tier = this.state.user?.subscription?.tier || 'free';
+        const tierData = this.data.subscriptionTiers.find(t => t.id === tier);
+        const itemLimit = tierData?.itemLimit || this.data.freeItemLimit;
+
+        if (itemLimit > 0 && this.state.closetItems.length >= itemLimit) {
+            // Show upgrade modal instead of blocking
+            Modal.show({
+                title: 'Free Limit Reached',
+                message: `You've scanned ${itemLimit} items - that's the free tier limit.\n\nImagine AI styling with your ENTIRE wardrobe.`,
+                primaryAction: { label: 'Transform My Closet', action: () => { Modal.hide(); Router.navigate('/transform'); }},
+                secondaryAction: { label: 'Maybe Later', action: () => Modal.hide() }
+            });
+            return null;
+        }
+
         const newItem = {
             id: Date.now().toString(),
             ...item,
@@ -1049,9 +1082,9 @@ const Screens = {
                     </div>
                 </div>
                 <div class="flex-1 px-6 pt-8 pb-6 animate-fade-in-up">
-                    <h2 class="brand-title text-4xl leading-tight mb-4">Your AI-Powered<br><span class="italic">Wardrobe Atelier.</span></h2>
-                    <p class="text-gray-500 text-sm leading-relaxed mb-8">Experience high-end personalization. Scan your collection to receive curated styling advice and exclusive outfit insights.</p>
-                    <button onclick="Router.navigate('/signup')" class="w-full bg-black text-white py-4 text-[11px] font-bold uppercase tracking-[0.2em] mb-4 active:scale-[0.98] transition-transform">Get Started</button>
+                    <h2 class="brand-title text-4xl leading-tight mb-4">Turn Your Closet<br><span class="italic">Into a Premium Boutique.</span></h2>
+                    <p class="text-gray-500 text-sm leading-relaxed mb-8">AI styling from YOUR actual wardrobe. A professional organizes your closet and scans every piece, then your personal stylist knows everything you own.</p>
+                    <button onclick="Router.navigate('/signup')" class="w-full bg-black text-white py-4 text-[11px] font-bold uppercase tracking-[0.2em] mb-4 active:scale-[0.98] transition-transform">Get Started Free</button>
                     <button onclick="Router.navigate('/login')" class="w-full text-center text-[11px] uppercase tracking-[0.2em] text-gray-500 py-2 active:opacity-70">Already have an account? <span class="text-black font-medium">Sign In</span></button>
                 </div>
             </div>
@@ -1377,7 +1410,7 @@ const Screens = {
 
     dailyEdit() {
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 ${Components.header({ subtitle: 'The Daily Edit' })}
                 <main class="flex-1 overflow-y-auto">
                     <div class="px-6 pt-6 animate-fade-in">
@@ -1414,14 +1447,13 @@ const Screens = {
                     </div>
                 </main>
                 ${Components.bottomNav('home')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
 
     lookbooks() {
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 ${Components.header({})}
                 <main class="flex-1 overflow-y-auto">
                     <div class="px-6 py-10">
@@ -1448,7 +1480,6 @@ const Screens = {
                     </div>
                 </main>
                 ${Components.bottomNav('home')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
@@ -1456,10 +1487,16 @@ const Screens = {
     closet() {
         const cats = App.data.categories;
         const filter = App.state.closetFilter;
-        const items = App.state.closetItems.filter(item => filter === 'All Items' || item.category === filter);
+        const allItems = App.state.closetItems;
+        const items = allItems.filter(item => filter === 'All Items' || item.category === filter);
+        const tier = App.state.user?.subscription?.tier || 'free';
+        const tierData = App.data.subscriptionTiers.find(t => t.id === tier);
+        const itemLimit = tierData?.itemLimit || App.data.freeItemLimit;
+        const isFree = tier === 'free';
+        const atLimit = isFree && allItems.length >= itemLimit;
 
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Screens.showMenu()" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">menu</span></button>
@@ -1470,42 +1507,138 @@ const Screens = {
                         <button onclick="Router.navigate('/scan')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">add</span></button>
                     </div>
                 </header>
-                <div class="sticky top-[88px] z-40 bg-white border-b border-gray-100">
-                    <div class="flex gap-6 px-6 overflow-x-auto">
-                        ${cats.map(c => `
-                            <button onclick="App.setClosetFilter('${c}')" class="py-4 text-sm whitespace-nowrap transition-colors ${filter===c?'text-black font-medium border-b-2 border-black':'text-gray-400 hover:text-gray-600'}">${c}</button>
-                        `).join('')}
+
+                ${allItems.length === 0 ? `
+                    <!-- Empty State - Premium Boutique Awaits -->
+                    <main class="flex-1 px-6 py-8">
+                        <div class="text-center animate-fade-in">
+                            <div class="w-24 h-24 bg-accent-gold/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <span class="material-symbols-outlined text-[48px] text-accent-gold">storefront</span>
+                            </div>
+                            <h2 class="brand-title text-3xl italic mb-3">Your Premium Boutique Awaits</h2>
+                            <p class="text-sm text-gray-500 mb-8 max-w-[280px] mx-auto">Transform your closet into a curated collection. AI styling that knows every piece you own.</p>
+
+                            <!-- Progress indicator -->
+                            <div class="bg-soft-gray p-6 mb-6">
+                                <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-3">Free Tier Progress</p>
+                                <div class="flex justify-center gap-2 mb-3">
+                                    ${[1,2,3,4,5].map(i => `<div class="w-8 h-8 rounded-full border-2 ${i <= allItems.length ? 'bg-black border-black' : 'border-gray-300'} flex items-center justify-center"><span class="text-xs ${i <= allItems.length ? 'text-white' : 'text-gray-400'}">${i}</span></div>`).join('')}
+                                </div>
+                                <p class="text-sm text-gray-600">${allItems.length} of ${itemLimit} free scans used</p>
+                            </div>
+
+                            <button onclick="Router.navigate('/scan')" class="w-full bg-black text-white py-4 text-[11px] font-bold uppercase tracking-[0.2em] mb-4 active:scale-[0.98] transition-transform">
+                                <span class="flex items-center justify-center gap-2">
+                                    <span class="material-symbols-outlined text-[18px]">photo_camera</span>
+                                    Scan Your First Item
+                                </span>
+                            </button>
+
+                            <div class="border-t border-gray-100 pt-6 mt-6">
+                                <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-3">Or get your entire closet scanned</p>
+                                <button onclick="Router.navigate('/transform')" class="w-full border-2 border-accent-gold text-accent-gold py-4 text-[11px] font-bold uppercase tracking-[0.2em] hover:bg-accent-gold hover:text-white transition-all">
+                                    <span class="flex items-center justify-center gap-2">
+                                        <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                                        Book a Pro Visit
+                                    </span>
+                                </button>
+                                <p class="text-xs text-gray-400 mt-2">A stylist scans your entire wardrobe in ~2 hours</p>
+                            </div>
+                        </div>
+                    </main>
+                ` : atLimit ? `
+                    <!-- At Limit State - Upgrade Prompt -->
+                    <div class="sticky top-[88px] z-40 bg-white border-b border-gray-100">
+                        <div class="flex gap-6 px-6 overflow-x-auto">
+                            ${cats.map(c => `
+                                <button onclick="App.setClosetFilter('${c}')" class="py-4 text-sm whitespace-nowrap transition-colors ${filter===c?'text-black font-medium border-b-2 border-black':'text-gray-400 hover:text-gray-600'}">${c}</button>
+                            `).join('')}
+                        </div>
                     </div>
-                </div>
-                <main class="flex-1 p-6">
-                    ${items.length > 0 ? `
+                    <main class="flex-1 p-6">
+                        <!-- Upgrade Banner -->
+                        <div class="bg-black text-white p-6 mb-6 animate-fade-in">
+                            <div class="flex items-start gap-4">
+                                <div class="w-12 h-12 bg-accent-gold rounded-full flex items-center justify-center flex-shrink-0">
+                                    <span class="material-symbols-outlined text-white">auto_awesome</span>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-1">You've unlocked AI styling!</p>
+                                    <h3 class="brand-title text-xl italic mb-2">But with only ${itemLimit} items...</h3>
+                                    <p class="text-sm text-gray-300 mb-4">Average closet: 120+ items. Yours: ${allItems.length}.</p>
+                                    <button onclick="Router.navigate('/transform')" class="w-full bg-accent-gold text-white py-3 text-[11px] font-bold uppercase tracking-[0.2em]">
+                                        Transform My Closet
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="grid grid-cols-2 gap-4">
                             ${items.map(item => Components.closetItem(item)).join('')}
                         </div>
-                    ` : `
-                        <div class="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
-                            <div class="w-20 h-20 bg-soft-gray rounded-full flex items-center justify-center mb-4">
-                                <span class="material-symbols-outlined text-[40px] text-gray-300">checkroom</span>
-                            </div>
-                            <h3 class="brand-title text-xl italic mb-2">Your closet is empty</h3>
-                            <p class="text-sm text-gray-500 mb-6">Start scanning items to build your digital wardrobe.</p>
-                            <button onclick="Router.navigate('/scan')" class="bg-black text-white px-8 py-3 text-[11px] font-bold uppercase tracking-[0.2em] active:scale-[0.98] transition-transform">
-                                Scan First Item
-                            </button>
+                        <p class="text-center py-8 text-[10px] uppercase tracking-[0.2em] text-gray-400">${allItems.length} of ${itemLimit} free items</p>
+                    </main>
+                ` : `
+                    <!-- Normal State with Progress -->
+                    <div class="sticky top-[88px] z-40 bg-white border-b border-gray-100">
+                        <div class="flex gap-6 px-6 overflow-x-auto">
+                            ${cats.map(c => `
+                                <button onclick="App.setClosetFilter('${c}')" class="py-4 text-sm whitespace-nowrap transition-colors ${filter===c?'text-black font-medium border-b-2 border-black':'text-gray-400 hover:text-gray-600'}">${c}</button>
+                            `).join('')}
                         </div>
-                    `}
-                    ${items.length > 0 ? `<p class="text-center py-8 text-[10px] uppercase tracking-[0.2em] text-gray-400">${items.length} item${items.length !== 1 ? 's' : ''} in collection</p>` : ''}
-                </main>
+                    </div>
+                    <main class="flex-1 p-6">
+                        ${isFree ? `
+                            <!-- Free tier progress bar -->
+                            <div class="bg-soft-gray p-4 mb-6 flex items-center justify-between">
+                                <div>
+                                    <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400">Free scans</p>
+                                    <p class="text-sm font-medium">${allItems.length} of ${itemLimit} used</p>
+                                </div>
+                                <div class="flex gap-1">
+                                    ${[1,2,3,4,5].map(i => `<div class="w-3 h-3 rounded-full ${i <= allItems.length ? 'bg-black' : 'bg-gray-300'}"></div>`).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <div class="grid grid-cols-2 gap-4">
+                            ${items.map(item => Components.closetItem(item)).join('')}
+                        </div>
+                        <p class="text-center py-8 text-[10px] uppercase tracking-[0.2em] text-gray-400">${allItems.length} item${allItems.length !== 1 ? 's' : ''} in collection</p>
+                    </main>
+                `}
                 ${Components.bottomNav('closet')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
 
     aiOutfit() {
         const occasions = App.data.occasions;
+        const closetItems = App.state.closetItems || [];
+        const currentOccasion = App.state.currentOccasion || occasions[0];
+        const currentOutfit = App.state.currentGeneratedOutfit;
+
+        // Check if user has enough items
+        if (closetItems.length < 2) {
+            Screens.showAiOutfitEmptyState();
+            return;
+        }
+
+        // If no outfit generated yet, generate one
+        if (!currentOutfit) {
+            Screens.generateNewOutfit(currentOccasion);
+            return;
+        }
+
+        // Find items by ID from closet
+        const getItem = (id) => closetItems.find(item => item.id === id);
+        const topItem = getItem(currentOutfit.outfit?.top);
+        const bottomItem = getItem(currentOutfit.outfit?.bottom);
+        const outerwearItem = getItem(currentOutfit.outfit?.outerwear);
+        const shoesItem = getItem(currentOutfit.outfit?.shoes);
+
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Screens.showMenu()" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">menu</span></button>
@@ -1513,51 +1646,210 @@ const Screens = {
                             <h1 class="brand-logo text-2xl font-medium italic">Stylistt</h1>
                             <p class="text-[10px] uppercase tracking-[0.3em] text-gray-400">AI Outfit Generator</p>
                         </div>
-                        <button onclick="Router.navigate('/shop')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">shopping_bag</span></button>
+                        <button onclick="Router.navigate('/closet')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">checkroom</span></button>
                     </div>
                 </header>
+
+                <!-- Occasion Tabs -->
                 <div class="border-b border-gray-100 overflow-x-auto">
                     <div class="flex gap-6 px-6 min-w-max">
-                        ${occasions.map((occ, i) => `
-                            <button class="py-4 ${i === 0 ? 'border-b-2 border-black' : 'text-gray-400'} whitespace-nowrap transition-colors hover:text-black">
+                        ${occasions.map(occ => `
+                            <button onclick="Screens.selectOccasion('${occ}')" class="py-4 ${occ === currentOccasion ? 'border-b-2 border-black' : 'text-gray-400'} whitespace-nowrap transition-colors hover:text-black">
                                 <span class="brand-title text-lg italic">${occ}</span>
                             </button>
                         `).join('')}
                     </div>
                 </div>
-                <main class="flex-1 px-6 py-6">
-                    <div class="relative aspect-[3/4] bg-gray-100 mb-6 overflow-hidden animate-fade-in group">
-                        <img src="${App.data.lookbooks[0].image}" alt="Generated Outfit" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700">
-                        <div class="absolute bottom-4 left-4 text-white">
-                            <p class="text-[10px] uppercase tracking-wider opacity-80">Look Match</p>
-                            <p class="text-4xl font-light">98%</p>
+
+                <main class="flex-1 px-6 py-6 overflow-y-auto">
+                    <!-- Match Score -->
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <p class="text-[10px] uppercase tracking-wider text-gray-400">AI Match Score</p>
+                            <p class="text-4xl font-light">${currentOutfit.matchScore || 85}%</p>
                         </div>
-                        <button onclick="App.toggleFavorite('ai-look-1')" class="absolute bottom-4 right-4 active:scale-110 transition-transform">
-                            <span class="material-symbols-outlined text-[28px] text-white ${App.isFavorite('ai-look-1') ? 'filled' : ''}">favorite</span>
+                        <button onclick="App.toggleFavorite('outfit-${currentOutfit.id}')" class="w-12 h-12 border border-gray-200 rounded-full flex items-center justify-center active:scale-90 transition-transform">
+                            <span class="material-symbols-outlined text-[24px] ${App.isFavorite('outfit-' + currentOutfit.id) ? 'filled text-accent-gold' : ''}">favorite</span>
                         </button>
                     </div>
-                    <div class="flex justify-center gap-4 mb-8 animate-fade-in-up">
-                        <button onclick="Toast.show('Swapping top...', 'info')" class="flex flex-col items-center gap-2 p-4 active:scale-95 transition-transform">
-                            <div class="w-12 h-12 border border-gray-200 rounded-full flex items-center justify-center hover:border-black transition-colors"><span class="material-symbols-outlined">checkroom</span></div>
-                            <span class="text-[10px] uppercase tracking-wider text-gray-500">Swap Top</span>
-                        </button>
-                        <button onclick="Toast.show('Regenerating outfit...', 'info'); setTimeout(() => Toast.show('New outfit ready!', 'success'), 1500)" class="flex flex-col items-center gap-2 p-4 bg-black text-white rounded-lg active:scale-95 transition-transform">
+
+                    <!-- Outfit Items Grid -->
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        ${topItem ? `
+                            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative group">
+                                <img src="${topItem.image}" alt="${topItem.name}" class="w-full h-full object-cover">
+                                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                                    <p class="text-white text-xs font-medium truncate">${topItem.name}</p>
+                                    <p class="text-white/70 text-[10px] uppercase">Top</p>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${bottomItem ? `
+                            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative group">
+                                <img src="${bottomItem.image}" alt="${bottomItem.name}" class="w-full h-full object-cover">
+                                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                                    <p class="text-white text-xs font-medium truncate">${bottomItem.name}</p>
+                                    <p class="text-white/70 text-[10px] uppercase">Bottom</p>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${outerwearItem ? `
+                            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative group">
+                                <img src="${outerwearItem.image}" alt="${outerwearItem.name}" class="w-full h-full object-cover">
+                                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                                    <p class="text-white text-xs font-medium truncate">${outerwearItem.name}</p>
+                                    <p class="text-white/70 text-[10px] uppercase">Layer</p>
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${shoesItem ? `
+                            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden relative group">
+                                <img src="${shoesItem.image}" alt="${shoesItem.name}" class="w-full h-full object-cover">
+                                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                                    <p class="text-white text-xs font-medium truncate">${shoesItem.name}</p>
+                                    <p class="text-white/70 text-[10px] uppercase">Shoes</p>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- AI Explanation -->
+                    ${currentOutfit.explanation ? `
+                        <div class="bg-soft-gray p-4 mb-6 rounded-lg">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="material-symbols-outlined text-accent-gold text-[18px]">auto_awesome</span>
+                                <span class="text-[10px] uppercase tracking-wider font-medium">Why This Works</span>
+                            </div>
+                            <p class="text-sm text-gray-600 leading-relaxed">${currentOutfit.explanation}</p>
+                        </div>
+                    ` : ''}
+
+                    <!-- Styling Tips -->
+                    ${currentOutfit.stylingTips ? `
+                        <div class="border border-gray-100 p-4 mb-6 rounded-lg">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="material-symbols-outlined text-[18px]">lightbulb</span>
+                                <span class="text-[10px] uppercase tracking-wider font-medium">Styling Tips</span>
+                            </div>
+                            <p class="text-sm text-gray-600 leading-relaxed">${currentOutfit.stylingTips}</p>
+                        </div>
+                    ` : ''}
+
+                    <!-- Action Buttons -->
+                    <div class="flex justify-center gap-4 mb-6">
+                        <button onclick="Screens.generateNewOutfit('${currentOccasion}')" class="flex flex-col items-center gap-2 p-4 bg-black text-white rounded-lg active:scale-95 transition-transform">
                             <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center"><span class="material-symbols-outlined">autorenew</span></div>
-                            <span class="text-[10px] uppercase tracking-wider">Regenerate</span>
-                        </button>
-                        <button onclick="Toast.show('Swapping bottom...', 'info')" class="flex flex-col items-center gap-2 p-4 active:scale-95 transition-transform">
-                            <div class="w-12 h-12 border border-gray-200 rounded-full flex items-center justify-center hover:border-black transition-colors"><span class="material-symbols-outlined">expand_more</span></div>
-                            <span class="text-[10px] uppercase tracking-wider text-gray-500">Swap Bottom</span>
+                            <span class="text-[10px] uppercase tracking-wider">New Outfit</span>
                         </button>
                     </div>
-                    <button onclick="App.updateUser({ looksCreated: (App.state.user?.looksCreated || 0) + 1 }); Toast.show('Look saved!', 'success')" class="w-full bg-black text-white py-4 text-[11px] font-bold uppercase tracking-[0.2em] active:scale-[0.98] transition-transform">
+
+                    <button onclick="Screens.saveOutfit()" class="w-full bg-black text-white py-4 text-[11px] font-bold uppercase tracking-[0.2em] active:scale-[0.98] transition-transform">
                         Save This Look
                     </button>
                 </main>
                 ${Components.bottomNav('styling')}
-                ${Components.appSwitcher()}
             </div>
         `;
+    },
+
+    showAiOutfitEmptyState() {
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white pb-24">
+                <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
+                    <div class="flex items-center justify-between">
+                        <button onclick="Screens.showMenu()" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">menu</span></button>
+                        <div class="text-center">
+                            <h1 class="brand-logo text-2xl font-medium italic">Stylistt</h1>
+                            <p class="text-[10px] uppercase tracking-[0.3em] text-gray-400">AI Outfit Generator</p>
+                        </div>
+                        <div class="w-10"></div>
+                    </div>
+                </header>
+                <main class="flex-1 flex flex-col items-center justify-center px-6 text-center">
+                    <div class="w-24 h-24 bg-soft-gray rounded-full flex items-center justify-center mb-6">
+                        <span class="material-symbols-outlined text-[48px] text-gray-400">styler</span>
+                    </div>
+                    <h2 class="brand-title text-2xl italic mb-2">Build Your Closet First</h2>
+                    <p class="text-sm text-gray-500 mb-8 max-w-[280px]">Add at least 2 items to your closet so our AI can create personalized outfit combinations.</p>
+                    <button onclick="Router.navigate('/scan')" class="bg-black text-white px-8 py-4 text-[11px] font-bold uppercase tracking-[0.2em] active:scale-[0.98] transition-transform">
+                        Scan Your First Item
+                    </button>
+                </main>
+                ${Components.bottomNav('styling')}
+            </div>
+        `;
+    },
+
+    async generateNewOutfit(occasion) {
+        // Show loading state
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white items-center justify-center">
+                <div class="text-center px-8 animate-fade-in">
+                    <div class="relative w-24 h-24 mx-auto mb-8">
+                        <div class="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
+                        <div class="absolute inset-0 border-4 border-black rounded-full border-t-transparent animate-spin"></div>
+                        <span class="material-symbols-outlined text-[32px] absolute inset-0 flex items-center justify-center">styler</span>
+                    </div>
+                    <h2 class="brand-title text-2xl italic mb-2">Creating Your Look</h2>
+                    <p class="text-sm text-gray-500 mb-4">Our AI is curating the perfect outfit for <span class="font-medium">${occasion}</span>...</p>
+                    <div class="space-y-2 text-left max-w-[200px] mx-auto">
+                        <div class="flex items-center gap-3 text-sm text-gray-600 animate-pulse">
+                            <span class="material-symbols-outlined text-accent-gold">check_circle</span>
+                            <span>Analyzing your closet</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 0.5s">
+                            <span class="material-symbols-outlined">pending</span>
+                            <span>Matching colors & styles</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1s">
+                            <span class="material-symbols-outlined">pending</span>
+                            <span>Writing styling advice</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        try {
+            const response = await fetch('/api/generate-outfit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    closetItems: App.state.closetItems,
+                    occasion: occasion,
+                    styleDNA: App.state.user?.styleDNA || {}
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to generate outfit');
+            }
+
+            const outfit = await response.json();
+            App.state.currentGeneratedOutfit = outfit;
+            App.state.currentOccasion = occasion;
+            Screens.aiOutfit();
+
+        } catch (error) {
+            console.error('Outfit generation error:', error);
+            Toast.show('Failed to generate outfit. Please try again.', 'error');
+            App.state.currentGeneratedOutfit = null;
+            Screens.aiOutfit();
+        }
+    },
+
+    selectOccasion(occasion) {
+        App.state.currentOccasion = occasion;
+        App.state.currentGeneratedOutfit = null; // Clear to regenerate
+        Screens.generateNewOutfit(occasion);
+    },
+
+    saveOutfit() {
+        const outfit = App.state.currentGeneratedOutfit;
+        if (outfit) {
+            App.updateUser({ looksCreated: (App.state.user?.looksCreated || 0) + 1 });
+            Toast.show('Look saved to your collection!', 'success');
+        }
     },
 
     scan() {
@@ -1608,11 +1900,11 @@ const Screens = {
         `;
     },
 
-    handleImageCapture(event) {
+    async handleImageCapture(event) {
         const file = event.target.files[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = async (e) => {
                 const preview = document.getElementById('preview-image');
                 const placeholder = document.getElementById('camera-placeholder');
                 preview.src = e.target.result;
@@ -1622,29 +1914,107 @@ const Screens = {
                 // Store the image for scan results
                 App.state.currentScanImage = e.target.result;
 
-                Toast.show('Photo captured! Processing...', 'info');
+                // Show processing screen
+                Screens.showScanProcessing();
 
-                // Simulate AI processing
-                setTimeout(() => {
+                try {
+                    // Call real AI analysis API
+                    const response = await fetch('/api/analyze-item', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image: e.target.result })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Analysis failed');
+                    }
+
+                    const analysis = await response.json();
+                    App.state.currentScanAnalysis = analysis;
                     Router.navigate('/scan/results');
-                }, 1500);
+
+                } catch (error) {
+                    console.error('Scan analysis error:', error);
+                    Toast.show('Analysis failed. Please try again.', 'error');
+                    Router.navigate('/scan');
+                }
             };
             reader.readAsDataURL(file);
         }
     },
 
+    showScanProcessing() {
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white items-center justify-center">
+                <div class="text-center px-8 animate-fade-in">
+                    <div class="relative w-24 h-24 mx-auto mb-8">
+                        <div class="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
+                        <div class="absolute inset-0 border-4 border-black rounded-full border-t-transparent animate-spin"></div>
+                        <span class="material-symbols-outlined text-[32px] absolute inset-0 flex items-center justify-center">checkroom</span>
+                    </div>
+                    <h2 class="brand-title text-2xl italic mb-2">Analyzing Your Piece</h2>
+                    <p class="text-sm text-gray-500 mb-8">Our AI is identifying fabric, color, and styling details...</p>
+                    <div class="space-y-2 text-left max-w-[200px] mx-auto">
+                        <div class="flex items-center gap-3 text-sm text-gray-600 animate-pulse">
+                            <span class="material-symbols-outlined text-accent-gold">check_circle</span>
+                            <span>Detecting category</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 0.5s">
+                            <span class="material-symbols-outlined">pending</span>
+                            <span>Analyzing fabric</span>
+                        </div>
+                        <div class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1s">
+                            <span class="material-symbols-outlined">pending</span>
+                            <span>Generating styling notes</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
     scanResults() {
         const image = App.state.currentScanImage;
+        const analysis = App.state.currentScanAnalysis || {};
+
+        // Use AI analysis or fallback to defaults
+        const name = analysis.name || 'Unidentified Item';
+        const brand = analysis.brand || 'Unknown';
+        const category = analysis.category || 'General';
+        const material = analysis.material || 'Mixed';
+        const color = analysis.color || 'Neutral';
+        const qualityTier = analysis.qualityTier || 'contemporary';
+        const stylingNotes = analysis.stylingNotes || '';
+        const styleTags = analysis.styleTags || [];
+        const occasions = analysis.occasions || [];
+
+        // Color mapping for visual display
+        const colorMap = {
+            'black': '#1a1a1a', 'charcoal': '#36454f', 'gray': '#808080', 'grey': '#808080',
+            'white': '#ffffff', 'cream': '#fffdd0', 'ivory': '#fffff0', 'beige': '#f5f5dc',
+            'navy': '#000080', 'blue': '#0066cc', 'light blue': '#add8e6', 'royal blue': '#4169e1',
+            'red': '#dc143c', 'burgundy': '#800020', 'wine': '#722f37', 'maroon': '#800000',
+            'green': '#228b22', 'olive': '#808000', 'sage': '#9dc183', 'forest': '#228b22',
+            'brown': '#8b4513', 'tan': '#d2b48c', 'camel': '#c19a6b', 'chocolate': '#7b3f00',
+            'pink': '#ffc0cb', 'blush': '#de5d83', 'rose': '#ff007f', 'coral': '#ff7f50',
+            'purple': '#800080', 'lavender': '#e6e6fa', 'plum': '#dda0dd', 'violet': '#ee82ee',
+            'yellow': '#ffd700', 'gold': '#ffd700', 'mustard': '#ffdb58', 'orange': '#ff8c00'
+        };
+        const colorHex = colorMap[color.toLowerCase()] || '#808080';
+
         document.getElementById('screen-container').innerHTML = `
             <div class="flex flex-col min-h-screen bg-white">
                 <header class="flex items-center justify-between px-6 pt-12 pb-4">
-                    <button onclick="history.back()" class="w-10 h-10 flex items-center justify-center rounded-full border border-gray-200 active:scale-90 transition-transform"><span class="material-symbols-outlined text-[20px]">arrow_back</span></button>
-                    <div class="bg-soft-gray px-4 py-2 rounded-full"><span class="text-[10px] uppercase tracking-wider">AI Analysis</span></div>
-                    <button class="w-10 h-10 flex items-center justify-center rounded-full border border-gray-200 active:scale-90 transition-transform"><span class="material-symbols-outlined text-[20px]">more_horiz</span></button>
+                    <button onclick="Router.navigate('/scan')" class="w-10 h-10 flex items-center justify-center rounded-full border border-gray-200 active:scale-90 transition-transform"><span class="material-symbols-outlined text-[20px]">arrow_back</span></button>
+                    <div class="bg-accent-gold/10 px-4 py-2 rounded-full flex items-center gap-2">
+                        <span class="material-symbols-outlined text-accent-gold text-[16px]">auto_awesome</span>
+                        <span class="text-[10px] uppercase tracking-wider font-medium">AI Verified</span>
+                    </div>
+                    <button onclick="Screens.editScanAnalysis()" class="w-10 h-10 flex items-center justify-center rounded-full border border-gray-200 active:scale-90 transition-transform"><span class="material-symbols-outlined text-[20px]">edit</span></button>
                 </header>
                 <div class="flex-1 bg-gradient-to-b from-gray-100 to-white">
                     <div class="h-64 flex items-center justify-center">
-                        ${image ? `<img src="${image}" alt="Scanned item" class="h-full w-auto object-contain">` : `
+                        ${image ? `<img src="${image}" alt="Scanned item" class="h-full w-auto object-contain rounded-lg shadow-lg">` : `
                             <div class="w-48 h-60 bg-gray-200 flex items-center justify-center">
                                 <span class="material-symbols-outlined text-[48px] text-gray-400">checkroom</span>
                             </div>
@@ -1653,35 +2023,72 @@ const Screens = {
                 </div>
                 <div class="bg-white rounded-t-3xl -mt-4 px-6 pt-8 pb-8 animate-fade-in-up">
                     <div class="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-6"></div>
-                    <div class="text-center mb-8">
-                        <h2 class="brand-title text-3xl italic mb-2">Classic Blazer</h2>
-                        <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400">Item #${Math.random().toString(36).substr(2, 8).toUpperCase()}</p>
+                    <div class="text-center mb-6">
+                        <h2 class="brand-title text-3xl italic mb-2">${name}</h2>
+                        <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400">${analysis.type || category}</p>
                     </div>
-                    <div class="space-y-4 mb-8">
-                        <div class="flex justify-between py-4 border-b border-gray-100">
-                            <span class="text-[10px] uppercase tracking-wider text-gray-400">Brand</span>
-                            <div class="text-right">
-                                <span class="block text-lg font-medium">Designer</span>
-                                <span class="text-[10px] uppercase text-accent-gold">AI Detected</span>
-                            </div>
+
+                    ${styleTags.length > 0 ? `
+                        <div class="flex flex-wrap gap-2 justify-center mb-6">
+                            ${styleTags.slice(0, 4).map(tag => `
+                                <span class="px-3 py-1 bg-soft-gray text-[10px] uppercase tracking-wider">${tag}</span>
+                            `).join('')}
                         </div>
+                    ` : ''}
+
+                    <div class="space-y-4 mb-6">
+                        ${brand && brand !== 'Unknown' ? `
+                            <div class="flex justify-between py-4 border-b border-gray-100">
+                                <span class="text-[10px] uppercase tracking-wider text-gray-400">Brand</span>
+                                <div class="text-right">
+                                    <span class="block text-lg font-medium">${brand}</span>
+                                    <span class="text-[10px] uppercase text-accent-gold">AI Detected</span>
+                                </div>
+                            </div>
+                        ` : ''}
                         <div class="flex justify-between py-4 border-b border-gray-100">
                             <span class="text-[10px] uppercase tracking-wider text-gray-400">Category</span>
-                            <span class="text-lg font-medium">Outerwear</span>
+                            <span class="text-lg font-medium">${category}</span>
                         </div>
                         <div class="flex justify-between py-4 border-b border-gray-100">
                             <span class="text-[10px] uppercase tracking-wider text-gray-400">Material</span>
-                            <span class="text-lg font-medium">Wool Blend</span>
+                            <span class="text-lg font-medium">${material}</span>
                         </div>
                         <div class="flex justify-between py-4 border-b border-gray-100">
                             <span class="text-[10px] uppercase tracking-wider text-gray-400">Color</span>
                             <div class="flex items-center gap-2">
-                                <div class="w-6 h-6 rounded-full bg-gray-800 border-2 border-white shadow"></div>
-                                <span class="text-lg font-medium">Charcoal</span>
+                                <div class="w-6 h-6 rounded-full border-2 border-white shadow" style="background-color: ${colorHex}"></div>
+                                <span class="text-lg font-medium">${color}</span>
                             </div>
                         </div>
+                        <div class="flex justify-between py-4 border-b border-gray-100">
+                            <span class="text-[10px] uppercase tracking-wider text-gray-400">Quality</span>
+                            <span class="text-lg font-medium capitalize">${qualityTier}</span>
+                        </div>
                     </div>
-                    <button onclick="Screens.confirmScan()" class="w-full bg-accent-gold text-white py-4 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
+
+                    ${stylingNotes ? `
+                        <div class="bg-soft-gray p-4 mb-6">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="material-symbols-outlined text-accent-gold text-[18px]">lightbulb</span>
+                                <span class="text-[10px] uppercase tracking-wider font-medium">Styling Tips</span>
+                            </div>
+                            <p class="text-sm text-gray-600 leading-relaxed">${stylingNotes}</p>
+                        </div>
+                    ` : ''}
+
+                    ${occasions.length > 0 ? `
+                        <div class="mb-6">
+                            <span class="text-[10px] uppercase tracking-wider text-gray-400 block mb-2">Perfect For</span>
+                            <div class="flex flex-wrap gap-2">
+                                ${occasions.slice(0, 5).map(occ => `
+                                    <span class="px-3 py-1 border border-gray-200 text-[10px] uppercase tracking-wider">${occ}</span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <button onclick="Screens.confirmScan()" class="w-full bg-black text-white py-4 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
                         <span class="text-[11px] font-bold uppercase tracking-wider">Add to Closet</span>
                         <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
                     </button>
@@ -1690,17 +2097,34 @@ const Screens = {
         `;
     },
 
+    editScanAnalysis() {
+        Toast.show('Edit feature coming soon!', 'info');
+    },
+
     confirmScan() {
+        const analysis = App.state.currentScanAnalysis || {};
+
         const item = {
-            name: 'Classic Blazer',
-            brand: 'Designer',
-            category: 'Outerwear',
-            material: 'Wool Blend',
-            color: 'Charcoal',
-            image: App.state.currentScanImage
+            id: analysis.id || `item_${Date.now()}`,
+            name: analysis.name || 'Unidentified Item',
+            brand: analysis.brand || null,
+            category: analysis.category || 'General',
+            type: analysis.type || analysis.category || 'Item',
+            material: analysis.material || 'Mixed',
+            color: analysis.color || 'Neutral',
+            colorFamily: analysis.colorFamily || 'neutral',
+            styleTags: analysis.styleTags || [],
+            occasions: analysis.occasions || [],
+            seasons: analysis.seasons || [],
+            qualityTier: analysis.qualityTier || 'contemporary',
+            stylingNotes: analysis.stylingNotes || '',
+            image: App.state.currentScanImage,
+            scannedAt: new Date().toISOString()
         };
+
         App.addToCloset(item);
         App.state.currentScanImage = null;
+        App.state.currentScanAnalysis = null;
         Router.navigate('/closet');
     },
 
@@ -1708,7 +2132,7 @@ const Screens = {
         const palette = App.data.palette;
         const user = App.state.user || {};
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 ${Components.header({ subtitle: 'Wardrobe Insights' })}
                 <main class="flex-1 overflow-y-auto">
                     <div class="px-6 py-12 text-center animate-fade-in">
@@ -1751,7 +2175,6 @@ const Screens = {
                     </div>
                 </main>
                 ${Components.bottomNav('home')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
@@ -1759,7 +2182,7 @@ const Screens = {
     profile() {
         const user = App.state.user || { name: 'Guest', initials: 'G', email: '', piecesScanned: 0, looksCreated: 0, archetype: 'Not Set' };
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white pt-12 pb-4 px-6">
                     <div class="flex items-center justify-between">
                         <h1 class="brand-logo text-2xl font-medium">Stylistt</h1>
@@ -1821,21 +2244,76 @@ const Screens = {
                             <span class="material-symbols-outlined text-gray-400">chevron_right</span>
                         </button>
                     </div>
-                    <div class="mt-8 bg-black text-white p-6">
-                        <h3 class="brand-title text-xl font-medium mb-2">Stylistt Pro</h3>
-                        <p class="text-sm text-gray-300 mb-4">Unlock unlimited AI outfit generations.</p>
-                        <button onclick="Toast.show('Coming soon!', 'info')" class="text-[11px] font-bold uppercase tracking-wider border-b border-white pb-1 hover:opacity-80 transition-opacity">Upgrade Now</button>
+
+                    <!-- Closet Concierge Section -->
+                    <div class="mt-8">
+                        <h3 class="text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-4">Closet Concierge</h3>
+                        ${(() => {
+                            const tier = App.state.user?.subscription?.tier || 'free';
+                            const tierData = App.data.subscriptionTiers.find(t => t.id === tier);
+                            const itemCount = App.state.closetItems?.length || 0;
+                            const itemLimit = tierData?.itemLimit || 5;
+
+                            if (tier === 'free') {
+                                return `
+                                    <div class="bg-soft-gray p-6">
+                                        <div class="flex items-start gap-4 mb-4">
+                                            <div class="w-12 h-12 bg-black text-white flex items-center justify-center">
+                                                <span class="material-symbols-outlined">dry_cleaning</span>
+                                            </div>
+                                            <div class="flex-1">
+                                                <h4 class="font-medium mb-1">Free Tier</h4>
+                                                <p class="text-sm text-gray-500">${itemCount} of ${itemLimit} items scanned</p>
+                                            </div>
+                                        </div>
+                                        <div class="h-1 bg-gray-200 mb-4">
+                                            <div class="h-full bg-black transition-all" style="width: ${Math.min((itemCount / itemLimit) * 100, 100)}%"></div>
+                                        </div>
+                                        <p class="text-sm text-gray-600 mb-4">Turn your closet into a premium boutique. A Stylistt Pro visits your home, organizes your wardrobe, and scans everything.</p>
+                                        <button onclick="Router.navigate('/transform')" class="w-full bg-black text-white py-3 text-[11px] font-bold uppercase tracking-[0.2em] active:opacity-80 transition-opacity">
+                                            Transform My Closet
+                                        </button>
+                                    </div>
+                                `;
+                            } else {
+                                return `
+                                    <div class="bg-soft-gray p-6">
+                                        <div class="flex items-start gap-4 mb-4">
+                                            <div class="w-12 h-12 bg-accent-gold text-white flex items-center justify-center">
+                                                <span class="material-symbols-outlined">workspace_premium</span>
+                                            </div>
+                                            <div class="flex-1">
+                                                <h4 class="font-medium mb-1">${tierData?.name || 'Premium'} Member</h4>
+                                                <p class="text-sm text-gray-500">Unlimited items & AI styling</p>
+                                            </div>
+                                        </div>
+                                        <div class="space-y-3 mb-4">
+                                            <div class="flex items-center justify-between text-sm">
+                                                <span class="text-gray-600">Visits this year</span>
+                                                <span class="font-medium">${tierData?.visits || 0} included</span>
+                                            </div>
+                                            <div class="flex items-center justify-between text-sm">
+                                                <span class="text-gray-600">Items scanned</span>
+                                                <span class="font-medium">${itemCount} pieces</span>
+                                            </div>
+                                        </div>
+                                        <button onclick="Router.navigate('/book-visit')" class="w-full border border-black py-3 text-[11px] font-bold uppercase tracking-[0.2em] hover:bg-black hover:text-white transition-all">
+                                            Schedule Next Visit
+                                        </button>
+                                    </div>
+                                `;
+                            }
+                        })()}
                     </div>
                 </div>
                 ${Components.bottomNav('profile')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
 
     shop() {
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 ${Components.header({ subtitle: 'Curated Shop' })}
                 <main class="flex-1 overflow-y-auto">
                     <div class="px-6 py-8 text-center animate-fade-in">
@@ -1860,7 +2338,6 @@ const Screens = {
                     </div>
                 </main>
                 ${Components.bottomNav('home')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
@@ -2207,11 +2684,11 @@ const Screens = {
 
     organizerr() {
         const user = App.state.user || {};
-        const sub = user.subscription || { tier: 'none' };
+        const sub = user.subscription || { tier: 'free' };
         const tierData = App.data.subscriptionTiers.find(t => t.id === sub.tier);
 
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Screens.showMenu()" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">menu</span></button>
@@ -2307,7 +2784,6 @@ const Screens = {
                     ` : ''}
                 </main>
                 ${Components.organizerrNav('home')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
@@ -2317,7 +2793,7 @@ const Screens = {
         const currentTier = user.subscription?.tier || 'none';
 
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Router.navigate('/organizerr')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">arrow_back</span></button>
@@ -2347,14 +2823,13 @@ const Screens = {
                     </p>
                 </main>
                 ${Components.organizerrNav('home')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
 
     organizerrBook() {
         const user = App.state.user || {};
-        const sub = user.subscription || { tier: 'none' };
+        const sub = user.subscription || { tier: 'free' };
         const organizers = App.data.mockOrganizers || [];
 
         // Generate next 14 days for date selection
@@ -2366,7 +2841,7 @@ const Screens = {
         }
 
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Router.navigate('/organizerr')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">arrow_back</span></button>
@@ -2476,7 +2951,6 @@ const Screens = {
                     </div>
                 ` : ''}
                 ${Components.organizerrNav('book')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
@@ -2503,7 +2977,7 @@ const Screens = {
         const past = visits.filter(v => v.status === 'completed');
 
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Router.navigate('/organizerr')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">arrow_back</span></button>
@@ -2591,7 +3065,6 @@ const Screens = {
                     `}
                 </main>
                 ${Components.organizerrNav('visits')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
@@ -2602,7 +3075,7 @@ const Screens = {
         const items = App.state.closetItems.filter(item => filter === 'All Items' || item.category === filter);
 
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Router.navigate('/organizerr')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">arrow_back</span></button>
@@ -2655,7 +3128,6 @@ const Screens = {
                     `}
                 </main>
                 ${Components.organizerrNav('closet')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
@@ -2670,7 +3142,7 @@ const Screens = {
         );
 
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Router.navigate('/organizerr')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">arrow_back</span></button>
@@ -2749,7 +3221,6 @@ const Screens = {
                     </div>
                 </main>
                 ${Components.organizerrNav('account')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
@@ -2815,7 +3286,7 @@ const Screens = {
         const clients = (user.connectedClients || []);
 
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Screens.showMenu()" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">menu</span></button>
@@ -2877,7 +3348,6 @@ const Screens = {
                     </div>
                 </main>
                 ${Components.organizerNav('dashboard')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
@@ -2897,7 +3367,7 @@ const Screens = {
         }));
 
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Router.navigate('/organizer')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">arrow_back</span></button>
@@ -2953,7 +3423,6 @@ const Screens = {
                     `}
                 </main>
                 ${Components.organizerNav('clients')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
@@ -2963,7 +3432,7 @@ const Screens = {
         const items = App.state.closetItems.slice(0, 6); // Use existing closet items as demo
 
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Router.navigate('/organizer/clients')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">arrow_back</span></button>
@@ -3006,14 +3475,13 @@ const Screens = {
                     `}
                 </main>
                 ${Components.organizerNav('clients')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
 
     organizerAddItem(clientId) {
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Router.navigate('/organizer/client/${clientId}')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">arrow_back</span></button>
@@ -3061,7 +3529,6 @@ const Screens = {
                     </form>
                 </main>
                 ${Components.organizerNav('clients')}
-                ${Components.appSwitcher()}
             </div>
         `;
 
@@ -3106,7 +3573,7 @@ const Screens = {
         const past = visits.filter(v => v.status === 'completed');
 
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Router.navigate('/organizer')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">arrow_back</span></button>
@@ -3192,7 +3659,6 @@ const Screens = {
                     `}
                 </main>
                 ${Components.organizerNav('schedule')}
-                ${Components.appSwitcher()}
             </div>
         `;
     },
@@ -3201,7 +3667,7 @@ const Screens = {
         const user = App.state.user || {};
 
         document.getElementById('screen-container').innerHTML = `
-            <div class="flex flex-col min-h-screen bg-white pb-36">
+            <div class="flex flex-col min-h-screen bg-white pb-24">
                 <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
                     <div class="flex items-center justify-between">
                         <button onclick="Router.navigate('/organizer')" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">arrow_back</span></button>
@@ -3252,9 +3718,233 @@ const Screens = {
                     </div>
                 </main>
                 ${Components.organizerNav('profile')}
-                ${Components.appSwitcher()}
             </div>
         `;
+    },
+
+    // ============ TRANSFORM SERVICE SCREEN ============
+    transform() {
+        const user = App.state.user || {};
+        const currentTier = user.subscription?.tier || 'free';
+        const tiers = App.data.subscriptionTiers.filter(t => t.id !== 'free');
+
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white">
+                <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
+                    <div class="flex items-center justify-between">
+                        <button onclick="history.back()" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">arrow_back</span></button>
+                        <div class="text-center">
+                            <h1 class="brand-logo text-2xl font-medium">Stylistt</h1>
+                            <p class="text-[10px] uppercase tracking-[0.3em] text-accent-gold">Transform</p>
+                        </div>
+                        <div class="w-10"></div>
+                    </div>
+                </header>
+                <main class="flex-1 overflow-y-auto">
+                    <!-- Hero Section -->
+                    <div class="px-6 py-8 text-center animate-fade-in">
+                        <div class="w-20 h-20 bg-accent-gold rounded-full flex items-center justify-center mx-auto mb-6">
+                            <span class="material-symbols-outlined text-[40px] text-white">storefront</span>
+                        </div>
+                        <h2 class="brand-title text-3xl italic mb-3">Turn Your Closet Into<br>a Premium Boutique</h2>
+                        <p class="text-sm text-gray-500 max-w-[300px] mx-auto">A professional stylist transforms your physical closet AND digitizes your entire wardrobe.</p>
+                    </div>
+
+                    <!-- What You Get -->
+                    <div class="px-6 py-6 bg-soft-gray animate-fade-in-up" style="animation-delay: 0.1s">
+                        <h3 class="text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-4">What You Get</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-start gap-4">
+                                <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                                    <span class="material-symbols-outlined text-accent-gold">home</span>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm">In-Home Visit</p>
+                                    <p class="text-xs text-gray-500">A professional comes to you - no effort required</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-4">
+                                <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                                    <span class="material-symbols-outlined text-accent-gold">checkroom</span>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm">Physical Organization</p>
+                                    <p class="text-xs text-gray-500">Your closet organized like a luxury boutique</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-4">
+                                <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                                    <span class="material-symbols-outlined text-accent-gold">photo_camera</span>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm">Full Digital Scan</p>
+                                    <p class="text-xs text-gray-500">Every piece photographed and cataloged</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-4">
+                                <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                                    <span class="material-symbols-outlined text-accent-gold">auto_awesome</span>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm">Unlimited AI Styling</p>
+                                    <p class="text-xs text-gray-500">Daily outfits from YOUR actual wardrobe</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing Tiers -->
+                    <div class="px-6 py-8">
+                        <h3 class="text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-6 text-center">Choose Your Plan</h3>
+                        <div class="space-y-4">
+                            ${tiers.map((tier, i) => `
+                                <div class="animate-fade-in-up" style="animation-delay: ${0.2 + i * 0.1}s">
+                                    <div class="border-2 ${tier.popular ? 'border-black' : 'border-gray-200'} p-6 relative">
+                                        ${tier.popular ? '<div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-black text-white px-4 py-1 text-[10px] uppercase tracking-wider">Most Popular</div>' : ''}
+                                        <div class="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h4 class="brand-title text-xl font-medium">${tier.name}</h4>
+                                                <p class="text-2xl font-light">${tier.priceLabel}</p>
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="text-[10px] uppercase tracking-wider text-gray-400">${tier.visits} visit${tier.visits > 1 ? 's' : ''}</span>
+                                            </div>
+                                        </div>
+                                        <ul class="space-y-2 mb-6">
+                                            ${tier.features.map(f => `
+                                                <li class="flex items-center gap-2 text-sm">
+                                                    <span class="material-symbols-outlined text-[16px] text-accent-gold">check</span>
+                                                    ${f}
+                                                </li>
+                                            `).join('')}
+                                        </ul>
+                                        <button onclick="App.subscribe('${tier.id}'); Toast.show('Subscription activated!', 'success'); Router.navigate('/book-visit');" class="w-full ${tier.popular ? 'bg-black text-white' : 'border border-black'} py-4 text-[11px] font-bold uppercase tracking-[0.2em] hover:bg-black hover:text-white transition-all">
+                                            ${currentTier === tier.id ? 'Current Plan' : 'Get Started'}
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Trust Badge -->
+                    <div class="px-6 pb-8">
+                        <div class="bg-soft-gray p-6 text-center">
+                            <div class="flex justify-center gap-1 mb-2">
+                                ${[1,2,3,4,5].map(() => '<span class="material-symbols-outlined text-accent-gold text-[16px]">star</span>').join('')}
+                            </div>
+                            <p class="text-sm font-medium mb-1">4.9 average rating</p>
+                            <p class="text-xs text-gray-500">Trusted by 2,400+ clients</p>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        `;
+    },
+
+    bookVisit() {
+        const organizers = App.data.mockOrganizers || [];
+        const dates = [];
+        for (let i = 1; i <= 14; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() + i);
+            dates.push(d);
+        }
+
+        document.getElementById('screen-container').innerHTML = `
+            <div class="flex flex-col min-h-screen bg-white">
+                <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md pt-12 pb-4 px-6 border-b border-gray-50">
+                    <div class="flex items-center justify-between">
+                        <button onclick="history.back()" class="active:scale-90 transition-transform"><span class="material-symbols-outlined">arrow_back</span></button>
+                        <div class="text-center">
+                            <h1 class="brand-logo text-2xl font-medium">Stylistt</h1>
+                            <p class="text-[10px] uppercase tracking-[0.3em] text-gray-400">Book Your Visit</p>
+                        </div>
+                        <div class="w-10"></div>
+                    </div>
+                </header>
+                <main class="flex-1 overflow-y-auto px-6 pt-6 pb-32">
+                    <!-- Select Organizer -->
+                    <div class="mb-8 animate-fade-in">
+                        <h3 class="text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-4">Choose Your Stylist</h3>
+                        <div class="space-y-3">
+                            ${organizers.map((org, i) => `
+                                <label class="block cursor-pointer">
+                                    <input type="radio" name="organizer" value="${org.id}" class="hidden peer" ${i === 0 ? 'checked' : ''}>
+                                    <div class="bg-soft-gray p-4 flex items-center gap-4 border-2 border-transparent peer-checked:border-black transition-all">
+                                        <div class="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center flex-shrink-0">
+                                            <span class="text-sm font-medium">${org.initials}</span>
+                                        </div>
+                                        <div class="flex-1">
+                                            <p class="font-medium text-sm">${org.name}</p>
+                                            <p class="text-xs text-gray-500">${org.specialty}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="flex items-center gap-1">
+                                                <span class="material-symbols-outlined text-accent-gold text-[16px]">star</span>
+                                                <span class="text-sm font-medium">${org.rating}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Select Date -->
+                    <div class="mb-8 animate-fade-in-up" style="animation-delay: 0.1s">
+                        <h3 class="text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-4">Select Date</h3>
+                        <div class="flex gap-3 overflow-x-auto pb-4">
+                            ${dates.slice(0, 7).map((d, i) => `
+                                <label class="cursor-pointer flex-shrink-0">
+                                    <input type="radio" name="date" value="${d.toISOString()}" class="hidden peer" ${i === 0 ? 'checked' : ''}>
+                                    <div class="w-16 py-4 bg-soft-gray text-center border-2 border-transparent peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-all">
+                                        <p class="text-[10px] uppercase">${d.toLocaleDateString('en-US', { weekday: 'short' })}</p>
+                                        <p class="text-xl font-bold">${d.getDate()}</p>
+                                    </div>
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Select Time -->
+                    <div class="mb-8 animate-fade-in-up" style="animation-delay: 0.15s">
+                        <h3 class="text-[10px] uppercase tracking-[0.2em] text-gray-400 mb-4">Select Time</h3>
+                        <div class="grid grid-cols-3 gap-3">
+                            ${['9:00 AM', '10:00 AM', '11:00 AM', '1:00 PM', '2:00 PM', '3:00 PM'].map((time, i) => `
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="time" value="${time}" class="hidden peer" ${i === 0 ? 'checked' : ''}>
+                                    <div class="py-3 bg-soft-gray text-center text-sm border-2 border-transparent peer-checked:border-black peer-checked:bg-black peer-checked:text-white transition-all">
+                                        ${time}
+                                    </div>
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Fixed Bottom CTA -->
+                <div class="fixed bottom-0 left-0 right-0 max-w-[430px] mx-auto bg-white/95 backdrop-blur-sm border-t border-gray-100 p-6 z-50">
+                    <button onclick="Screens.confirmTransformBooking()" class="w-full bg-black text-white py-4 text-[11px] font-bold uppercase tracking-[0.2em] active:scale-[0.98] transition-transform">
+                        Confirm Booking
+                    </button>
+                </div>
+            </div>
+        `;
+    },
+
+    confirmTransformBooking() {
+        const organizer = document.querySelector('input[name="organizer"]:checked')?.value;
+        const date = document.querySelector('input[name="date"]:checked')?.value;
+        const time = document.querySelector('input[name="time"]:checked')?.value;
+
+        if (organizer && date && time) {
+            App.bookVisit(organizer, date, time);
+            Toast.show('Visit booked! We\'ll transform your closet.', 'success');
+            Router.navigate('/profile');
+        } else {
+            Toast.show('Please select all options', 'error');
+        }
     }
 };
 
@@ -3282,15 +3972,11 @@ Router.register('/favorites', Screens.favorites);
 Router.register('/sustainability', Screens.sustainability);
 Router.register('/item/:id', Screens.itemDetail);
 
-// Organizerr Client Routes
-Router.register('/organizerr', Screens.organizerr);
-Router.register('/organizerr/plans', Screens.organizerrPlans);
-Router.register('/organizerr/book', Screens.organizerrBook);
-Router.register('/organizerr/visits', Screens.organizerrVisits);
-Router.register('/organizerr/closet', Screens.organizerrCloset);
-Router.register('/organizerr/organizers', Screens.organizerrOrganizers);
+// Closet Transformation Routes
+Router.register('/transform', Screens.transform);
+Router.register('/book-visit', Screens.bookVisit);
 
-// Organizer Routes
+// Organizer Routes (for professionals)
 Router.register('/organizer-signup', Screens.organizerSignup);
 Router.register('/organizer', Screens.organizer);
 Router.register('/organizer/clients', Screens.organizerClients);
