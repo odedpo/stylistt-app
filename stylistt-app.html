@@ -2021,24 +2021,30 @@ const Screens = {
 
                 try {
                     // Call Claude to analyze item
+                    console.log('Starting scan analysis...');
                     const response = await fetch('/api/analyze-item', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ image: e.target.result })
                     });
 
+                    console.log('Response status:', response.status);
+
                     if (!response.ok) {
-                        throw new Error('Analysis failed');
+                        const errorData = await response.json().catch(() => ({}));
+                        console.error('API error:', errorData);
+                        throw new Error(errorData.message || 'Analysis failed');
                     }
 
                     const analysis = await response.json();
+                    console.log('Analysis complete:', analysis);
                     App.state.currentScanAnalysis = analysis;
                     Router.navigate('/scan/results');
 
                 } catch (error) {
                     console.error('Scan analysis error:', error);
-                    Toast.show('Analysis failed. Please try again.', 'error');
-                    Router.navigate('/scan');
+                    Toast.show(error.message || 'Analysis failed. Please try again.', 'error');
+                    setTimeout(() => Router.navigate('/scan'), 2000);
                 }
             };
             reader.readAsDataURL(file);
