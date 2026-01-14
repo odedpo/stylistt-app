@@ -1816,10 +1816,6 @@ const Screens = {
                             <span class="material-symbols-outlined">pending</span>
                             <span>Writing styling advice</span>
                         </div>
-                        <div id="step-model" class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1.5s">
-                            <span class="material-symbols-outlined">pending</span>
-                            <span>Generating model shot</span>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1899,39 +1895,9 @@ const Screens = {
                 if (item) outfitItemsWithImages.push(item);
             }
 
-            // Generate model shot with Gemini
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 45000);
-                console.log('Generating model shot...');
-                const modelResponse = await fetch('/api/enhance-image', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    signal: controller.signal,
-                    body: JSON.stringify({
-                        action: 'generate-outfit-model',
-                        outfitItems: outfitItemsWithImages.map(item => ({
-                            name: item.name,
-                            category: item.category,
-                            type: item.type,
-                            color: item.color,
-                            image: item.image
-                        })),
-                        occasion: occasion
-                    })
-                });
-                clearTimeout(timeoutId);
-                if (modelResponse.ok) {
-                    const modelData = await modelResponse.json();
-                    if (modelData.modelImage) {
-                        outfit.modelImage = modelData.modelImage;
-                    }
-                }
-            } catch (modelError) {
-                console.warn('Model generation failed:', modelError.message);
-            }
-
-            updateStep('step-model', 'done');
+            // Model shot generation disabled for now
+            // Requires Vertex AI SDK setup for Imagen 3
+            // Core outfit generation works without this feature
             App.state.currentGeneratedOutfit = outfit;
             App.state.currentOccasion = occasion;
             Screens.aiOutfit();
