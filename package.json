@@ -2,6 +2,7 @@
   "name": "stylistt-app",
   "version": "1.0.0",
   "description": "AI-powered personal styling app",
+  "type": "module",
   "private": true,
   "scripts": {
     "dev": "vercel dev",
@@ -12,6 +13,6 @@
     "@anthropic-ai/sdk": "^0.27.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   }
 }
