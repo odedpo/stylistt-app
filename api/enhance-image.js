@@ -123,22 +123,14 @@ export default async function handler(req, res) {
             });
 
         } else if (action === 'generate-outfit-model') {
-            // Generate a model wearing a complete outfit using text description
+            // Generate a model wearing a complete outfit using Imagen 3
             const { outfitItems, occasion } = req.body;
 
             if (!outfitItems || !Array.isArray(outfitItems) || outfitItems.length === 0) {
                 return res.status(400).json({ error: 'No outfit items provided' });
             }
 
-            // Use Imagen model for image generation
-            const model = genAI.getGenerativeModel({
-                model: 'gemini-2.0-flash-exp',
-                generationConfig: {
-                    responseModalities: ['Text', 'Image']
-                }
-            });
-
-            // Build detailed outfit description for text-to-image generation
+            // Build detailed outfit description
             const outfitDescription = outfitItems
                 .map(item => {
                     const details = [];
@@ -150,50 +142,38 @@ export default async function handler(req, res) {
                 })
                 .join(', ');
 
-            const prompt = `Generate a high-fashion editorial photograph of a stylish female model wearing this outfit: ${outfitDescription}.
+            const prompt = `A professional fashion photography shot of a beautiful model wearing: ${outfitDescription}. The occasion is ${occasion || 'casual'}. Full body shot, elegant pose, clean white studio background, luxury fashion magazine style, professional lighting, high quality photograph.`;
 
-Occasion: ${occasion || 'everyday wear'}
+            console.log('Generating image with Imagen 3, prompt:', prompt);
 
-Style requirements:
-- Full body or 3/4 length shot
-- Model posed elegantly and confidently
-- Clean white or light gray studio background
-- Professional fashion photography lighting
-- High-end luxury fashion magazine aesthetic
-- Sharp focus, high quality image
+            // Use Imagen 3 for image generation
+            const imageModel = genAI.getGenerativeModel({ model: 'imagen-3.0-generate-002' });
 
-Generate the image now.`;
+            const result = await imageModel.generateImages({
+                prompt: prompt,
+                config: {
+                    numberOfImages: 1,
+                    aspectRatio: '3:4',
+                    safetyFilterLevel: 'BLOCK_MEDIUM_AND_ABOVE'
+                }
+            });
 
-            console.log('Generating model image with prompt:', prompt);
+            console.log('Imagen result:', JSON.stringify(result));
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-
-            // Log full response for debugging
-            console.log('Gemini response candidates:', JSON.stringify(response.candidates?.length || 0));
-
-            // Check if we got an image back
             let modelImage = null;
-            let textResponse = '';
 
-            if (response.candidates && response.candidates[0]?.content?.parts) {
-                for (const part of response.candidates[0].content.parts) {
-                    console.log('Response part type:', part.inlineData ? 'image' : 'text');
-                    if (part.inlineData) {
-                        modelImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                    } else if (part.text) {
-                        textResponse = part.text;
-                    }
+            if (result.images && result.images.length > 0) {
+                const imageData = result.images[0];
+                if (imageData.image?.imageBytes) {
+                    modelImage = `data:image/png;base64,${imageData.image.imageBytes}`;
+                    console.log('Image generated successfully');
                 }
             }
-
-            console.log('Model image generated:', modelImage ? 'yes' : 'no');
-            console.log('Text response:', textResponse?.substring(0, 200));
 
             return res.status(200).json({
                 success: true,
                 modelImage: modelImage,
-                description: textResponse
+                description: `Generated outfit: ${outfitDescription}`
             });
 
         } else {
