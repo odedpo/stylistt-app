@@ -1816,6 +1816,10 @@ const Screens = {
                             <span class="material-symbols-outlined">pending</span>
                             <span>Writing styling advice</span>
                         </div>
+                        <div id="step-model" class="flex items-center gap-3 text-sm text-gray-400 animate-pulse" style="animation-delay: 1.5s">
+                            <span class="material-symbols-outlined">pending</span>
+                            <span>Generating model shot</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1895,9 +1899,35 @@ const Screens = {
                 if (item) outfitItemsWithImages.push(item);
             }
 
-            // Model shot generation disabled for now
-            // Requires Vertex AI SDK setup for Imagen 3
-            // Core outfit generation works without this feature
+            // Generate model shot with Gemini 2.5 Flash Image
+            try {
+                console.log('Generating model shot...');
+                const modelResponse = await fetch('/api/enhance-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'generate-outfit-model',
+                        outfitItems: outfitItemsWithImages.map(item => ({
+                            name: item.name,
+                            category: item.category,
+                            type: item.type,
+                            color: item.color,
+                            material: item.material
+                        })),
+                        occasion: occasion
+                    })
+                });
+
+                if (modelResponse.ok) {
+                    const modelData = await modelResponse.json();
+                    console.log('Model response:', modelData.modelImage ? 'has image' : 'no image');
+                    if (modelData.modelImage) {
+                        outfit.modelImage = modelData.modelImage;
+                    }
+                }
+            } catch (modelError) {
+                console.warn('Model generation failed:', modelError.message);
+            }
             App.state.currentGeneratedOutfit = outfit;
             App.state.currentOccasion = occasion;
             Screens.aiOutfit();
